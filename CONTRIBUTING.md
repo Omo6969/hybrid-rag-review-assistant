@@ -31,16 +31,16 @@ Clone the repository and set up a reproducible environment. Examples:
 
 Conda:
 ```bash
-git clone <repo-url>
-cd <project-folder>
+git clone git@github.com:UBC-MDS/DSCI_575_project_omo001_deepray.git
+cd DSCI_575_project_omo001_deepray
 conda env create -f environment.yml
-conda activate <env-name>
+conda activate amazon-retrieval
 ```
 
 Pip + venv:
 ```bash
-git clone <repo-url>
-cd <project-folder>
+git clone git@github.com:UBC-MDS/DSCI_575_project_omo001_deepray.git
+cd DSCI_575_project_omo001_deepray
 python -m venv .venv
 # macOS / Linux
 source .venv/bin/activate
@@ -74,10 +74,10 @@ Run the app or notebooks as described in `README.md` (example: `streamlit run ap
 - No direct commits were made to `main`.
 
 ## Collaboration Norms
-- Keep PRs small; request reviews early.
+- Keep PRs small, request reviews early.
 - Scope branches to a single concern and avoid unrelated commits.
 - If collaboration problems recur, open an issue to adjust the process.
 
 ---
 
-Thanks — your contributions keep the project reproducible, reviewable, and useful.
+Thanks, your contributions keep the project reproducible, reviewable, and useful.
