@@ -1,0 +1,21 @@
+name: amazon-retrieval
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.11.15
+  - pip=26.0.1
+  - numpy=2.4.3
+  - pandas=3.0.2
+  - duckdb=1.5.1
+  - jupyterlab=4.5.6
+  - notebook=7.5.5
+  - scikit-learn=1.8.0
+  - matplotlib=3.10.8
+  - faiss-cpu=1.10.0
+  - pip:
+      - shiny=1.6.0
+      - shinychat=0.2.9
+      - rank-bm25=0.2.2
+      - sentence-transformers=5.4.0
+      - python-dotenv=1.2.2
