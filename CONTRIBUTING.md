@@ -3,14 +3,14 @@
 Thank you for contributing to this DSCI_575 project. This document explains the preferred workflow, coding norms, and practical steps to get started.
 
 ## Quickstart
-- Fork (if external) and clone the repo; or clone the team repo directly.
+- Fork (if external) and clone the repo, or clone the team repo directly.
 - Create a branch for each task (see Branch Naming Convention).
 - Work in small commits, open a focused PR, and request at least one reviewer.
 
 ## Issues & PRs
 - Use GitHub Issues for bugs, feature requests, and tasks. One issue = one task.
 - Link issues from PRs and describe the change and rationale in the PR body.
-- Do not push directly to `main`; use PRs for all changes.
+- Do not push directly to `main`, use PRs for all changes.
 
 ## Collaboration Workflow
 - Follow GitHub Flow: branch from `main`, open PRs, require reviews before merging.
@@ -80,4 +80,4 @@ Run the app or notebooks as described in `README.md` (example: `streamlit run ap
 
 ---
 
-Thanks, your contributions keep the project reproducible, reviewable, and useful.
+Thank you, your contributions keep the project reproducible, reviewable, and useful.
