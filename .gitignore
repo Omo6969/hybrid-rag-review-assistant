@@ -1,2 +1,7 @@
 *ipynb_checkpoints*
 environment.pinned.yml
+/.venv/
+/.env
+data/raw/
+__pycache__/
+*.pyc
