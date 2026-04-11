@@ -18,11 +18,11 @@ Thank you for contributing to this DSCI_575 project. This document explains the 
 - Keep discussions on GitHub Issues or PR comments for traceability.
 
 ## Branch Naming Convention
-- `feature/<short-description>` — new features
-- `fix/<short-description>` — bug fixes
-- `docs/<short-description>` — documentation updates
-- `test/<short-description>` — tests
-- `chore/<short-description>` — maintenance
+- `feature/<short-description>` - new features
+- `fix/<short-description>` - bug fixes
+- `docs/<short-description>` - documentation updates
+- `test/<short-description>` - tests
+- `chore/<short-description>` - maintenance
 
 Examples: `feature/eda-notebook`, `fix/tokenization-bug`, `docs/readme-update`.
 
