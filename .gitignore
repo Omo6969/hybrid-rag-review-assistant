@@ -4,6 +4,7 @@ environment.pinned.yml
 /.env
 __pycache__/
 *.pyc
+*.csv
 
 # Keep the folders, ignore their contents
 data/raw/*
