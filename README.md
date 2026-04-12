@@ -82,8 +82,8 @@ For Milestone 1, the project explores:
 
 The final retrieval pipeline for Milestone 1 uses the **All_Beauty** category:
 
-- `All_Beauty.jsonl` or `All_Beauty.jsonl.gz`
-- `meta_All_Beauty.jsonl` or `meta_All_Beauty.jsonl.gz`
+- `All_Beauty.jsonl`
+- `meta_All_Beauty.jsonl`
 
 These files should be stored in `data/raw/` and should not be committed to Git.
 
@@ -155,30 +155,112 @@ pip install -e .
 
 ## Data Setup
 
-Place the selected raw data files in:
+Use this README section:
 
-```text
-data/raw/
+## Data Setup
+
+Raw and sampled data files are managed with the project shell scripts.
+
+### 1. Download raw category files
+
+To download one or more Amazon Reviews 2023 category files into `data/raw/`, run:
+
+```bash
+bash src/scripts/download_data.sh <Category1> [Category2 ...]
 ```
 
-At minimum, for Milestone 1, the following files should be available:
+Example:
+
+```bash
+bash src/scripts/download_data.sh All_Beauty Health_and_Personal_Care
+```
+
+This downloads both the review and metadata files for each category into `data/raw/`.
+
+### 2. Re-download existing raw files
+
+If the raw files already exist and you want to download them again, use `--force`:
+
+```bash
+bash src/scripts/download_data.sh --force <Category1> [Category2 ...]
+```
+
+Example:
+
+```bash
+bash src/scripts/download_data.sh --force All_Beauty
+```
+
+### 3. Create sampled files for EDA
+
+To create sampled JSONL files from the raw data for lightweight exploration, run:
+
+```bash
+bash src/scripts/create_samples.sh <DatasetName1> [DatasetName2 ...]
+```
+
+Example:
+
+```bash
+bash src/scripts/create_samples.sh All_Beauty meta_All_Beauty Health_and_Personal_Care meta_Health_and_Personal_Care
+```
+
+This creates files such as:
 
 ```text
-data/raw/All_Beauty.jsonl
-or
- data/raw/All_Beauty.jsonl.gz
-
-data/raw/meta_All_Beauty.jsonl
-or
- data/raw/meta_All_Beauty.jsonl.gz
+data/processed/sample_All_Beauty.jsonl
+data/processed/sample_meta_All_Beauty.jsonl
 ```
+
+By default, the script keeps the first **200** records from each input file.
+
+### 4. Create samples with a custom size
+
+To create larger or smaller samples, use `--lines`:
+
+```bash
+bash src/scripts/create_samples.sh --lines <N> <DatasetName1> [DatasetName2 ...]
+```
+
+Example:
+
+```bash
+bash src/scripts/create_samples.sh --lines 300 All_Beauty meta_All_Beauty
+```
+
+### 5. Recreate existing sample files
+
+If sample files already exist and you want to overwrite them, use `--force`:
+
+```bash
+bash src/scripts/create_samples.sh --force <DatasetName1> [DatasetName2 ...]
+```
+
+Example:
+
+```bash
+bash src/scripts/create_samples.sh --force All_Beauty meta_All_Beauty
+```
+
+You can also combine `--force` and `--lines`:
+
+```bash
+bash src/scripts/create_samples.sh --force --lines 300 All_Beauty meta_All_Beauty
+```
+
+### 6. Notes
+
+- Raw downloaded files are stored in `data/raw/`.
+- Sampled files for EDA are stored in `data/processed/`.
+- These data files should **not** be committed to Git.
+- If you run either script without dataset names, it will show usage guidance and report whether matching files already exist.
 
 ## Build the Processed Dataset
 
 Run the dataset-building script to generate the cleaned retrieval dataset:
 
 ```bash
-python scripts/make_datasets.py
+python src/scripts/make_datasets.py
 ```
 
 This creates processed outputs in:
@@ -199,7 +281,7 @@ All_Beauty_clean.jsonl
 ### Build BM25 artifacts
 
 ```bash
-python scripts/build_bm25_index.py
+python src/scripts/build_bm25_index.py
 ```
 
 This saves BM25 artifacts under:
@@ -211,7 +293,7 @@ data/processed/bm25_index/
 ### Build semantic retrieval artifacts
 
 ```bash
-python scripts/build_semantic_index.py
+python src/scripts/build_semantic_index.py
 ```
 
 This saves semantic retrieval artifacts under:
@@ -224,7 +306,7 @@ These saved artifacts make later runs faster because the retrievers can be loade
 
 ## Running the Notebooks
 
-Start Jupyter:
+You can run the notebook in VScode (with Jupyter-related extensions installed) or Start Jupyter:
 
 ```bash
 jupyter lab
@@ -239,7 +321,7 @@ notebooks/milestone1_exploration.ipynb
 for exploratory analysis and preprocessing decisions, and:
 
 ```text
-notebooks/evaluation.ipynb
+notebooks/milestone1_evaluation.ipynb
 ```
 
 for retrieval comparison and qualitative evaluation.
@@ -251,7 +333,7 @@ To reproduce this project successfully:
 - create the environment from `environment.yml`
 - install the project with `pip install -e .`
 - place the raw dataset files in `data/raw/`
-- run `scripts/make_datasets.py` to build the cleaned dataset
+- run `src/scripts/make_datasets.py` to build the cleaned dataset
 - run the BM25 and semantic indexing scripts to save retrieval artifacts
 - open the notebooks as needed for EDA and evaluation
 - keep raw data and secrets out of version control
@@ -268,8 +350,8 @@ This milestone does **not** use LLMs yet.
 
 ## Contributors
 
-- **omo001**
-- **deepray**
+- **Ruth Adwowa Yankson**
+- **Omowunmi**
 
 ## License
 
