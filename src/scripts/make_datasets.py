@@ -24,6 +24,9 @@ def main() -> None:
         join_col="parent_asin",
         clean_text=True,
     )
+    
+    if final_df.empty:
+        raise ValueError("Processed dataset is empty after filtering invalid text rows.")
 
     final_df.to_parquet(output_dir / "All_Beauty_clean.parquet", index=False)
     final_df.to_json(
