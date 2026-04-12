@@ -155,6 +155,12 @@ conda activate amazon-retrieval
 python -m pip install -r requirements.txt
 ```
 
+### 4. Install the project in editable mode
+
+```bash
+pip install -e .
+```
+
 ## Data Download
 
 Download the selected category files into `data/raw/` using:

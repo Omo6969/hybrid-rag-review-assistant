@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amazon-product-retrieval"
+version = "0.1.0"
+description = "DSCI 575 Milestone 1 retrieval system for Amazon Reviews 2023"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "Ruth Adwowa Yankson" },
+  { name = "Omo" }
+]
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
