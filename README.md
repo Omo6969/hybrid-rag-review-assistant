@@ -2,35 +2,37 @@
 
 ## Overview
 
-**Smart Amazon Product Query Assistant** is a retrieval-focused product search system built on the **Amazon Reviews 2023** dataset. The goal of this project is to help users search for relevant Amazon products using natural-language queries and compare how well different retrieval methods capture user intent.
+**Smart Amazon Product Query Assistant** is a retrieval-focused product search system built on the **Amazon Reviews 2023** dataset. The goal of the project is to retrieve relevant Amazon product-review documents from natural-language queries and compare how well different retrieval methods capture user intent.
 
 For **Milestone 1**, the project focuses on **retrieval only**. The system implements:
 
 - **BM25** keyword-based retrieval
 - **Semantic search** using sentence embeddings and vector similarity
-- A simple **interactive web app** for searching the corpus
+- qualitative comparison of both methods on a shared query set
 
-Our project uses two Amazon product categories to strike a balance between dataset richness and computational manageability:
+The project initially explored two categories:
 
 - **All_Beauty**
 - **Health_and_Personal_Care**
 
-The system is designed to support queries such as:
+After exploratory analysis, **All_Beauty** was selected as the primary category for Milestone 1 retrieval experiments.
+
+Example query types include:
 
 > "fragrance-free moisturizer for sensitive skin"  
-> "gentle cleanser for acne-prone skin"  
-> "travel-size skincare products"
+> "gentle makeup remover"  
+> "skin care product for very dry lips in winter"
 
-By comparing BM25 and semantic retrieval on the same query set, the project highlights the strengths and weaknesses of classical and embedding-based search for product discovery.
+By comparing BM25 and semantic retrieval on the same query set, the project highlights the strengths and weaknesses of lexical and embedding-based search for product discovery.
 
 ## Project Goals
 
 This project aims to:
 
-- Build a reproducible retrieval pipeline on Amazon review and metadata files
-- Compare **keyword-based** and **semantic** retrieval approaches
-- Evaluate retrieval quality qualitatively across different query types
-- Provide a simple interface for interactive search
+- build a reproducible retrieval pipeline on Amazon review and metadata files
+- compare **keyword-based** and **semantic** retrieval approaches
+- evaluate retrieval quality qualitatively across different query types
+- prepare retrieval outputs for later app integration
 
 ## Major Repository Structure
 
@@ -39,99 +41,95 @@ DSCI_575_project_omo001_deepray/
 │
 ├── README.md
 ├── environment.yml
-├── requirements.txt
-├── .env                       # never commit secrets
+├── pyproject.toml
+├── .gitignore
 │
 ├── data/
-│   ├── raw/                   # downloaded .jsonl.gz files (gitignored)
-│   └── processed/             # cleaned data, indexes, embeddings, cached artifacts
+│   ├── raw/                   # downloaded Amazon .jsonl/.jsonl.gz files (gitignored)
+│   └── processed/             # cleaned datasets and saved retrieval artifacts (gitignored)
 │
 ├── notebooks/
+│   ├── milestone1_evaluation.ipynb
 │   └── milestone1_exploration.ipynb
 │
 ├── src/
+│   ├── __init__.py
 │   ├── bm25.py
 │   ├── semantic.py
+│   ├── preprocessing.py
 │   └── utils/
 │       ├── __init__.py
 │       ├── io.py
-│       ├── preprocessing.py
-│       └── corpus.py
+│       └── preprocessing.py
 │
 ├── results/
 │   └── milestone1_discussion.md
 │
-├── app/
-│   └── app.py
-│
 └── scripts/
-    └── download_data.sh
+    ├── make_datasets.py
+    ├── build_bm25_index.py
+    └── build_semantic_index.py
 ```
 
 ## Dataset
 
 This project uses the **Amazon Reviews 2023** dataset from McAuley Lab.
 
-Selected categories:
+For Milestone 1, the project explores:
 
 - `All_Beauty`
 - `Health_and_Personal_Care`
 
-For each category, we use:
+The final retrieval pipeline for Milestone 1 uses the **All_Beauty** category:
 
-- the **review file**: `<Category>.jsonl.gz`
-- the **metadata file**: `meta_<Category>.jsonl.gz`
+- `All_Beauty.jsonl`
+- `meta_All_Beauty.jsonl`
 
-These files are stored in `data/raw/` and are excluded from Git.
+These files should be stored in `data/raw/` and should not be committed to Git.
 
 ## Retrieval Workflow
 
 ### 1. Data exploration and preprocessing
 
-In `notebooks/milestone1_exploration.ipynb`, we:
+In `notebooks/milestone1_exploration.ipynb`, the project:
 
-- inspect review and metadata records
-- examine available fields
-- choose the fields used for retrieval
-- justify preprocessing decisions
+- inspects review and metadata records
+- examines available fields and missingness
+- compares candidate categories
+- justifies the selected retrieval fields
+- explains preprocessing decisions
 
-A retrieval document is constructed by combining review text with relevant product metadata such as title, description, and product features where available.
+The final processed retrieval dataset is built separately using `scripts/make_datasets.py`, rather than depending on notebook execution.
 
 ### 2. BM25 retrieval
 
 The BM25 pipeline:
 
-- tokenizes the corpus
+- tokenizes the document corpus
 - preprocesses queries consistently with documents
 - ranks documents by BM25 relevance score
+- saves reusable BM25 artifacts to disk
 
 ### 3. Semantic retrieval
 
 The semantic retrieval pipeline:
 
-- generates sentence embeddings for retrieval documents
-- indexes them using a vector similarity backend
+- generates dense sentence embeddings for retrieval documents
+- indexes them with FAISS
 - retrieves semantically similar results for natural-language queries
+- saves reusable semantic retrieval artifacts to disk
 
 ### 4. Qualitative evaluation
 
-We create a diverse set of queries and compare BM25 and semantic retrieval on:
+The project creates a diverse set of queries spanning easy, medium, and complex search intent, then compares BM25 and semantic retrieval on the same query set.
 
-- direct keyword queries
-- intent-driven semantic queries
-- more complex product-search queries
+The evaluation workflow is documented in:
 
-The discussion and observations are recorded in:
+- `notebooks/evaluation.ipynb`
+
+The final written discussion and observations are recorded in:
 
 - `results/milestone1_discussion.md`
-
-### 5. Web app
-
-The Shiny app provides:
-
-- a query input box
-- a retrieval mode selector
-- top search results with product title, text snippet, rating, and retrieval score
 
 ## Installation
 
@@ -142,42 +140,173 @@ git clone https://github.com/UBC-MDS/DSCI_575_project_omo001_deepray
 cd DSCI_575_project_omo001_deepray
 ```
 
-### 2. Create and activate the environment
+### 2. Create and activate the conda environment
 
 ```bash
 conda env create -f environment.yml
 conda activate amazon-retrieval
 ```
 
-### 3. Install any runtime packages if needed
-
-```bash
-python -m pip install -r requirements.txt
-```
-
-### 4. Install the project in editable mode
+### 3. Install the project in editable mode
 
 ```bash
 pip install -e .
 ```
 
-## Data Download
+## Data Setup
 
-Download the selected category files into `data/raw/` using:
+Use this README section:
+
+## Data Setup
+
+Raw and sampled data files are managed with the project shell scripts.
+
+### 1. Download raw category files
+
+To download one or more Amazon Reviews 2023 category files into `data/raw/`, run:
 
 ```bash
-bash scripts/download_data.sh All_Beauty Health_and_Personal_Care
+bash src/scripts/download_data.sh <Category1> [Category2 ...]
 ```
 
-After downloading, confirm the files exist in:
+Example:
+
+```bash
+bash src/scripts/download_data.sh All_Beauty Health_and_Personal_Care
+```
+
+This downloads both the review and metadata files for each category into `data/raw/`.
+
+### 2. Re-download existing raw files
+
+If the raw files already exist and you want to download them again, use `--force`:
+
+```bash
+bash src/scripts/download_data.sh --force <Category1> [Category2 ...]
+```
+
+Example:
+
+```bash
+bash src/scripts/download_data.sh --force All_Beauty
+```
+
+### 3. Create sampled files for EDA
+
+To create sampled JSONL files from the raw data for lightweight exploration, run:
+
+```bash
+bash src/scripts/create_samples.sh <DatasetName1> [DatasetName2 ...]
+```
+
+Example:
+
+```bash
+bash src/scripts/create_samples.sh All_Beauty meta_All_Beauty Health_and_Personal_Care meta_Health_and_Personal_Care
+```
+
+This creates files such as:
 
 ```text
-data/raw/
+data/processed/sample_All_Beauty.jsonl
+data/processed/sample_meta_All_Beauty.jsonl
 ```
 
-## Running the notebook
+By default, the script keeps the first **200** records from each input file.
 
-Start Jupyter and open the EDA notebook:
+### 4. Create samples with a custom size
+
+To create larger or smaller samples, use `--lines`:
+
+```bash
+bash src/scripts/create_samples.sh --lines <N> <DatasetName1> [DatasetName2 ...]
+```
+
+Example:
+
+```bash
+bash src/scripts/create_samples.sh --lines 300 All_Beauty meta_All_Beauty
+```
+
+### 5. Recreate existing sample files
+
+If sample files already exist and you want to overwrite them, use `--force`:
+
+```bash
+bash src/scripts/create_samples.sh --force <DatasetName1> [DatasetName2 ...]
+```
+
+Example:
+
+```bash
+bash src/scripts/create_samples.sh --force All_Beauty meta_All_Beauty
+```
+
+You can also combine `--force` and `--lines`:
+
+```bash
+bash src/scripts/create_samples.sh --force --lines 300 All_Beauty meta_All_Beauty
+```
+
+### 6. Notes
+
+- Raw downloaded files are stored in `data/raw/`.
+- Sampled files for EDA are stored in `data/processed/`.
+- These data files should **not** be committed to Git.
+- If you run either script without dataset names, it will show usage guidance and report whether matching files already exist.
+
+## Build the Processed Dataset
+
+Run the dataset-building script to generate the cleaned retrieval dataset:
+
+```bash
+python src/scripts/make_datasets.py
+```
+
+This creates processed outputs in:
+
+```text
+data/processed/
+```
+
+including files such as:
+
+```text
+All_Beauty_clean.parquet
+All_Beauty_clean.jsonl
+```
+
+## Build Retrieval Artifacts
+
+### Build BM25 artifacts
+
+```bash
+python src/scripts/build_bm25_index.py
+```
+
+This saves BM25 artifacts under:
+
+```text
+data/processed/bm25_index/
+```
+
+### Build semantic retrieval artifacts
+
+```bash
+python src/scripts/build_semantic_index.py
+```
+
+This saves semantic retrieval artifacts under:
+
+```text
+data/processed/semantic_index/
+```
+
+These saved artifacts make later runs faster because the retrievers can be loaded instead of rebuilt.
+
+## Running the Notebooks
+
+You can run the notebook in VScode (with Jupyter-related extensions installed) or Start Jupyter:
 
 ```bash
 jupyter lab
@@ -189,36 +318,25 @@ Then open:
 notebooks/milestone1_exploration.ipynb
 ```
 
----
+for exploratory analysis and preprocessing decisions, and:
 
-## Running the app locally
-
-To run the Shiny app locally:
-
-```bash
-shiny run --reload app/app.py
+```text
+notebooks/milestone1_evaluation.ipynb
 ```
 
-If needed, you can also run:
-
-```bash
-python -m shiny run --reload app/app.py
-```
-
----
+for retrieval comparison and qualitative evaluation.
 
 ## Reproducibility Notes
 
 To reproduce this project successfully:
 
 - create the environment from `environment.yml`
-- install runtime packages from `requirements.txt` if necessary
-- download the raw dataset files into `data/raw/`
-- keep `.env` out of version control
-- run the notebook for exploration and preprocessing
-- run the app from `app/app.py`
-
----
+- install the project with `pip install -e .`
+- place the raw dataset files in `data/raw/`
+- run `src/scripts/make_datasets.py` to build the cleaned dataset
+- run the BM25 and semantic indexing scripts to save retrieval artifacts
+- open the notebooks as needed for EDA and evaluation
+- keep raw data and secrets out of version control
 
 ## Current Milestone Scope
 
@@ -226,25 +344,17 @@ This repository currently targets **Milestone 1**, which focuses on:
 
 - retrieval foundations
 - qualitative evaluation
-- a basic retrieval app
+- reproducible indexing workflows
 
 This milestone does **not** use LLMs yet.
 
----
-
 ## Contributors
 
-- **omo001**
-- **deepray**
-
----
-
-## Contribution Notes
-
-This project is being developed collaboratively through GitHub commits and incremental milestone submissions. Both contributors should make regular, meaningful commits with descriptive commit messages.
-
----
+- **Ruth Adwowa Yankson**
+- **Omowunmi**
 
 ## License
 
-This project is for academic use within **DSCI 575**.
+This repository was developed for the DSCI 575 course project at UBC.
+It is intended for course-related use within DSCI 575 and should not be
+copied, redistributed, or reused outside the course context without permission.
