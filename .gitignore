@@ -2,6 +2,13 @@
 environment.pinned.yml
 /.venv/
 /.env
-data/raw/
 __pycache__/
 *.pyc
+
+# Keep the folders, ignore their contents
+data/raw/*
+data/processed/*
+
+# But keep placeholder files so the folders exist in Git
+!data/raw/.gitkeep
+!data/processed/.gitkeep
