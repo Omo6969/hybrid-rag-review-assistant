@@ -19,6 +19,15 @@ data/processed/*
 *.index
 *.faiss
 *.npy
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+*PKG-INFO*
+dependency_links.txt
+SOURCES.txt
+top_level.txt
 
 # OS / editor junk
 .DS_Store
