@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Download full gz files for selected categories into data/raw/
-# Usage: bash scripts/download_data.sh All_Beauty Beauty_and_Personal_Care
+# Download selected Amazon Reviews 2023 category files from Hugging Face into data/raw/
+# Usage: bash src/scripts/download_data.sh All_Beauty Health_and_Personal_Care
 
 set -euo pipefail
 
@@ -12,16 +12,17 @@ fi
 mkdir -p data/raw
 
 for cat in "$@"; do
-  review_url="https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023/resolve/main/${cat}.jsonl.gz"
-  meta_url="https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023/resolve/main/meta_${cat}.jsonl.gz"
-  out_review="data/raw/${cat}.jsonl.gz"
-  out_meta="data/raw/meta_${cat}.jsonl.gz"
+  review_url="https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023/resolve/main/raw/review_categories/${cat}.jsonl?download=true"
+  meta_url="https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023/resolve/main/raw/meta_categories/meta_${cat}.jsonl?download=true"
+
+  out_review="data/raw/${cat}.jsonl"
+  out_meta="data/raw/meta_${cat}.jsonl"
 
   echo "Downloading ${cat} reviews to ${out_review}..."
-  curl -L -o "${out_review}" "${review_url}"
+  curl -L --fail -o "${out_review}" "${review_url}"
 
   echo "Downloading ${cat} metadata to ${out_meta}..."
-  curl -L -o "${out_meta}" "${meta_url}"
+  curl -L --fail -o "${out_meta}" "${meta_url}"
 done
 
-echo "Download finished. Remember: do not commit files in data/raw/ to Git." 
+echo "Download finished. Remember: do not commit files in data/raw/ to Git."
