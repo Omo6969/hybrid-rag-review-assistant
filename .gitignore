@@ -12,3 +12,15 @@ data/processed/*
 # But keep placeholder files so the folders exist in Git
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+
+# indexes / artifacts
+*.pkl
+*.pickle
+*.index
+*.faiss
+*.npy
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+.vscode/
