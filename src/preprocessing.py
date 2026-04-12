@@ -6,6 +6,8 @@ import re
 
 import pandas as pd
 
+from src.utils.preprocessing import tokenize_text, normalize_text
+
 
 def find_repo_root(max_up: int = 6) -> Path:
     """
@@ -168,6 +170,11 @@ def simple_clean(text: object) -> str:
     return cleaned.strip()
 
 
+import pandas as pd
+
+from src.utils.preprocessing import tokenize_text, normalize_text
+
+
 def build_retrieval_dataframe(
     reviews_df: pd.DataFrame,
     meta_df: pd.DataFrame,
@@ -190,7 +197,7 @@ def build_retrieval_dataframe(
     join_col : str, default="parent_asin"
         Column used to merge reviews and metadata.
     clean_text : bool, default=True
-        Whether to apply lightweight cleaning to the combined text field.
+        Whether to normalize the combined text field.
 
     Returns
     -------
@@ -202,6 +209,8 @@ def build_retrieval_dataframe(
     ------
     KeyError
         If required columns are missing from `reviews_df`.
+    ValueError
+        If no valid retrieval records remain after filtering.
     """
     required_review_cols = {"asin", "parent_asin", "title", "text", "rating"}
     missing = required_review_cols - set(reviews_df.columns)
@@ -221,8 +230,8 @@ def build_retrieval_dataframe(
         {
             "parent_asin": merged_df["parent_asin"],
             "asin": merged_df["asin"],
-            "title": merged_df["title_review"].fillna(""),
-            "review_text": merged_df["text"].fillna(""),
+            "title": merged_df["title_review"].fillna("").astype(str),
+            "review_text": merged_df["text"].fillna("").astype(str),
             "rating": pd.to_numeric(merged_df["rating"], errors="coerce"),
         }
     )
@@ -232,18 +241,28 @@ def build_retrieval_dataframe(
     )
 
     retrieval_df["text"] = (
-        retrieval_df["title"].fillna("").str.cat(
-            retrieval_df["review_text"].fillna(""),
-            sep=" "
-        ).str.strip()
+        retrieval_df["title"].str.cat(retrieval_df["review_text"], sep=" ").str.strip()
     )
 
     if clean_text:
-        retrieval_df["text"] = retrieval_df["text"].apply(simple_clean)
+        retrieval_df["text"] = retrieval_df["text"].apply(normalize_text)
 
     final_df = retrieval_df[
         ["doc_id", "parent_asin", "asin", "title", "rating", "text"]
     ].copy()
+
+    # Remove rows with empty or non-tokenizable text.
+    before_count = len(final_df)
+
+    final_df["text"] = final_df["text"].fillna("").astype(str)
+    final_df = final_df[final_df["text"].str.strip() != ""].copy()
+    final_df = final_df[
+        final_df["text"].apply(lambda x: len(tokenize_text(x)) > 0)
+    ].copy()
+
+    removed_count = before_count - len(final_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} rows with empty or non-tokenizable text.")
 
     validate_retrieval_dataframe(final_df)
 
