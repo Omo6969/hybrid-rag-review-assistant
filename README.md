@@ -34,7 +34,7 @@ This project aims to:
 - evaluate retrieval quality qualitatively across different query types
 - prepare retrieval outputs for later app integration
 
-## Repository Structure
+## Major Repository Structure
 
 ```text
 DSCI_575_project_omo001_deepray/
@@ -46,11 +46,11 @@ DSCI_575_project_omo001_deepray/
 │
 ├── data/
 │   ├── raw/                   # downloaded Amazon .jsonl/.jsonl.gz files (gitignored)
-│   └── processed/             # cleaned datasets and saved retrieval artifacts
+│   └── processed/             # cleaned datasets and saved retrieval artifacts (gitignored)
 │
 ├── notebooks/
-│   ├── milestone1_exploration.ipynb
-│   └── evaluation.ipynb
+│   ├── milestone1_evaluation.ipynb
+│   └── milestone1_exploration.ipynb
 │
 ├── src/
 │   ├── __init__.py
