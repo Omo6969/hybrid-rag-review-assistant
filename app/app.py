@@ -17,13 +17,13 @@ def load_retrievers():
     if Path("data/processed/bm25_index").exists():
         try:
             bm25 = BM25Retriever.load("data/processed/bm25_index")
-        except:
+        except Exception:
             bm25 = None
 
     if Path("data/processed/semantic_index").exists():
         try:
             sem = SemanticRetriever.load("data/processed/semantic_index")
-        except:
+        except Exception:
             sem = None
 
     return bm25, sem
@@ -35,14 +35,25 @@ def truncate(text, n=200):
 
 
 def get_doc_id(doc):
+    """
+    Compute a document identifier from a retrieval document.
+
+    If the document has a "doc_id" field, it is used directly.
+    Otherwise, a hash of the concatenation of the title and text fields is used.
+
+    Returns:
+        str: The document identifier.
+    """
+    if doc.get("doc_id") is not None:
+        return str(doc["doc_id"])
     text = (doc.get("title", "") + doc.get("text", "")).encode("utf-8")
     return hashlib.md5(text).hexdigest()
 
 
-# UI 
+# UI
 app_ui = ui.page_fluid(
     ui.h2("🔍 Amazon Review Retrieval App"),
-    ui.p("Search product reviews using BM25, Semantic, or Hybrid search."),
+    ui.p("Search Amazon product reviews using BM25, semantic, or hybrid retrieval."),
 
     ui.page_sidebar(
         ui.sidebar(
@@ -54,7 +65,7 @@ app_ui = ui.page_fluid(
             ),
             ui.input_numeric(
                 "top_k",
-                "Number of results (default: 3)",
+                "Number of results",
                 value=3,
                 min=1,
                 max=10,
@@ -149,7 +160,7 @@ def server(input, output, session):
 
             try:
                 stars = "★" * int(round(float(rating)))
-            except:
+            except Exception:
                 stars = str(rating)
 
             like_id = f"like_{doc_id}"
@@ -157,7 +168,7 @@ def server(input, output, session):
 
             ui_list.append(
                 ui.div(
-                    ui.h4(f"{i}. {title}"),
+                    ui.h5(f"{i}. {title}"),
                     ui.p(text),
                     ui.p(f"Rating: {stars} ({rating})"),
                     ui.p(f"Score: {score:.4f}"),
@@ -171,7 +182,7 @@ def server(input, output, session):
             for btn_id, value in [(like_id, 1), (dislike_id, -1)]:
                 try:
                     current = int(getattr(input, btn_id)())
-                except:
+                except Exception:
                     current = 0
 
                 prev = prev_counts.get(btn_id, 0)
