@@ -1,4 +1,4 @@
-# Milestone 1 — Qualitative Evaluation (Steps 4.3 & 4.4)
+# Milestone 1 - Qualitative Evaluation 
 
 This document contains the comparison of BM25 and Semantic retrieval for selected queries and a short summary of insights.
 
