@@ -26,7 +26,6 @@ This document contains the comparison of BM25 and Semantic retrieval for selecte
 - Semantic search returns similar results but slightly more natural phrasing.
 - **Better Method:** Tie (slight edge to BM25 for precision)
 
----
 
 ### Query 2: "face moisturizer"
 
@@ -50,7 +49,6 @@ This document contains the comparison of BM25 and Semantic retrieval for selecte
 - **Better Method:** BM25  
 - **Reason:** Better diversity and specificity.
 
----
 
 ### Query 3: "sunscreen for face"
 
@@ -74,7 +72,6 @@ This document contains the comparison of BM25 and Semantic retrieval for selecte
 - **Better Method:** BM25  
 - **Reason:** Better alignment with query intent (“for face”).
 
----
 
 ### Query 4: "something for dry skin"
 
@@ -99,7 +96,6 @@ This document contains the comparison of BM25 and Semantic retrieval for selecte
 - **Better Method:** Semantic Search  
 - **Reason:** Better intent matching, though still weak overall.
 
----
 
 ### Query 5: "product to reduce frizzy hair"
 
@@ -123,7 +119,6 @@ This document contains the comparison of BM25 and Semantic retrieval for selecte
 - **Better Method:** BM25  
 - **Reason:** More consistent relevance despite minor noise.
 
----
 
 ## Observations
 
@@ -137,3 +132,55 @@ This document contains the comparison of BM25 and Semantic retrieval for selecte
   - lacks diversity
 - BM25 sometimes:
   - retrieves irrelevant results due to keyword overlap
+
+## 4.4 Summary
+
+### Strengths of BM25
+- Strong performance on keyword-based queries
+- Produces more diverse and descriptive results
+- Works well when query terms directly match documents
+- More consistent ranking quality in most cases
+
+### Weaknesses of BM25
+- Fails for vague or natural language queries (e.g., “something for dry skin”)
+- Cannot understand intent beyond exact words
+- Can retrieve irrelevant results due to keyword overlap
+
+
+### Strengths of Semantic Search
+- Better at understanding user intent
+- Performs better on vague/descriptive queries
+- Handles natural language better than BM25
+
+### Weaknesses of Semantic Search
+- Often produces generic or repetitive results
+- Lacks diversity in retrieved documents
+- Sometimes returns incomplete or missing results
+- Less precise for keyword-heavy queries
+
+
+### Challenging Query Types for Both Methods
+- Vague queries with little context (e.g., “something for dry skin”)
+- Queries requiring multiple conditions or constraints
+- Queries where user intent is ambiguous
+
+
+### Where Advanced Methods Can Help
+
+#### 1. Reranking
+- Can improve ordering of retrieved results
+- Helps remove irrelevant or low-quality results
+
+#### 2. Hybrid Search (BM25 + Semantic)
+- Combines keyword precision with semantic understanding
+- Likely to improve overall retrieval performance
+
+#### 3. RAG (Retrieval-Augmented Generation)
+- Can interpret user intent more deeply
+- Useful for complex or conversational queries
+
+
+### Conclusion
+BM25 demonstrated stronger overall performance in this evaluation, largely due to the keyword-heavy nature of the dataset and queries. However, semantic search showed clear advantages in handling natural language and intent-based queries.
+
+These results suggest that neither method alone is sufficient for all query types. A hybrid approach, potentially combined with reranking or RAG, would provide the most robust and effective retrieval system in real-world applications.
