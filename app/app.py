@@ -167,3 +167,37 @@ def server(input, output, session):
                 )
             )
 
+            # Save feedback
+            for btn_id, value in [(like_id, 1), (dislike_id, -1)]:
+                try:
+                    current = int(getattr(input, btn_id)())
+                except:
+                    current = 0
+
+                prev = prev_counts.get(btn_id, 0)
+
+                if current > prev:
+                    with open(feedback_file, "a", newline="", encoding="utf-8") as f:
+                        writer = csv.writer(f)
+                        writer.writerow(
+                            [
+                                datetime.utcnow().isoformat(),
+                                query,
+                                mode,
+                                doc_id,
+                                title,
+                                f"{score:.6f}",
+                                value,
+                            ]
+                        )
+
+                    prev_counts[btn_id] = current
+
+        if not ui_list:
+            return ui.p("No results found.")
+
+        return ui.TagList(ui_list)
+
+
+# Run App
+app = App(app_ui, server)
