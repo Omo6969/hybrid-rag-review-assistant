@@ -67,3 +67,73 @@ app_ui = ui.page_fluid(
 )
 
 
+# Server
+def server(input, output, session):
+    bm25, sem = load_retrievers()
+
+    # Feedback file setup
+    feedback_file = Path("data/processed/feedback.csv")
+    feedback_file.parent.mkdir(parents=True, exist_ok=True)
+
+    if not feedback_file.exists():
+        with open(feedback_file, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                ["timestamp", "query", "mode", "doc_id", "title", "score", "feedback"]
+            )
+
+    prev_counts = {}
+
+    @output
+    @render.ui
+    def results():
+        if input.search() == 0:
+            return ui.p("Enter a query and click Search.")
+
+        query = input.query().strip()
+        mode = input.mode()
+        top_k = int(input.top_k() or 3)
+
+        if not query:
+            return ui.p("Please enter a query.")
+
+        # Retrieval
+        if mode == "BM25":
+            if bm25 is None:
+                return ui.p("BM25 index not found. Please build it first.")
+            results_docs = bm25.search(query, top_k)
+
+        elif mode == "Semantic":
+            if sem is None:
+                return ui.p("Semantic index not found. Please build it first.")
+            results_docs = sem.search(query, top_k)
+
+        else:  # Hybrid
+            if bm25 is None or sem is None:
+                return ui.p("Both BM25 and Semantic indices are required.")
+
+            bm25_res = bm25.search(query, top_k * 5)
+            sem_res = sem.search(query, top_k * 5)
+
+            scores = {}
+            docs = {}
+
+            for r in bm25_res:
+                doc_id = get_doc_id(r)
+                scores[doc_id] = scores.get(doc_id, 0) + float(r.get("score", 0))
+                docs[doc_id] = r
+
+            for r in sem_res:
+                doc_id = get_doc_id(r)
+                scores[doc_id] = scores.get(doc_id, 0) + float(r.get("score", 0))
+                docs[doc_id] = r
+
+            ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_k]
+
+            results_docs = []
+            for doc_id, score in ranked:
+                doc = docs[doc_id]
+                doc["score"] = score
+                results_docs.append(doc)
+
+ 
