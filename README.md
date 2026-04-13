@@ -131,6 +131,7 @@ The final written discussion and observations are recorded in:
 
 - `results/milestone1_discussion.md`
 
+
 ## Installation
 
 ### 1. Clone the repository
@@ -152,6 +153,8 @@ conda activate amazon-retrieval
 ```bash
 pip install -e .
 ```
+
+Include these generated files in your release artifacts: `results/milestone1_results.md`, `results/milestone1_discussion.md`, and `results/milestone1_summary.md`.
 
 ## Data Setup
 
@@ -304,6 +307,47 @@ data/processed/semantic_index/
 
 These saved artifacts make later runs faster because the retrievers can be loaded instead of rebuilt.
 
+### Qualitative Evaluation
+
+Open the evaluation notebook:
+
+```text
+notebooks/milestone1_evaluation.ipynb
+```
+
+Run all cells in the notebook to:
+
+- execute BM25 retrieval
+- execute semantic retrieval
+- generate top-5 results for each query
+
+The outputs displayed in the notebook correspond to the comparisons documented in:
+
+```text
+results/milestone1_discussion.md
+```
+
+### Running the APP
+
+The application file is located at:
+
+```text
+app/app.py
+```
+
+From the project root directory, run:
+
+```bash
+python -m shiny run app/app.py
+```
+
+After running the command, a local server will start and a link will appear in the terminal, typically:
+
+[http://127.0.0.1:8000](http://127.0.0.1:8000)
+
+Open this link in your browser to access the app.
+
+
 ## Running the Notebooks
 
 You can run the notebook in VScode (with Jupyter-related extensions installed) or Start Jupyter:
@@ -351,7 +395,7 @@ This milestone does **not** use LLMs yet.
 ## Contributors
 
 - **Ruth Adwowa Yankson**
-- **Omowunmi**
+- **Omowunmi Obadero**
 
 ## License
 
