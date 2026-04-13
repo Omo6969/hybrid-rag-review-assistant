@@ -136,4 +136,34 @@ def server(input, output, session):
                 doc["score"] = score
                 results_docs.append(doc)
 
- 
+        # Display
+        ui_list = []
+
+        for i, r in enumerate(results_docs, 1):
+            title = r.get("title", "No title")
+            text = truncate(r.get("text", ""))
+            rating = r.get("rating", "N/A")
+            score = float(r.get("score", 0))
+
+            doc_id = get_doc_id(r)
+
+            try:
+                stars = "★" * int(round(float(rating)))
+            except:
+                stars = str(rating)
+
+            like_id = f"like_{doc_id}"
+            dislike_id = f"dislike_{doc_id}"
+
+            ui_list.append(
+                ui.div(
+                    ui.h4(f"{i}. {title}"),
+                    ui.p(text),
+                    ui.p(f"Rating: {stars} ({rating})"),
+                    ui.p(f"Score: {score:.4f}"),
+                    ui.input_action_button(like_id, "👍"),
+                    ui.input_action_button(dislike_id, "👎"),
+                    ui.hr(),
+                )
+            )
+
