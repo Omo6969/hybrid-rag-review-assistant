@@ -154,8 +154,6 @@ conda activate amazon-retrieval
 pip install -e .
 ```
 
-Include these generated files in your release artifacts: `results/milestone1_results.md`, `results/milestone1_discussion.md`, and `results/milestone1_summary.md`.
-
 ## Data Setup
 
 Use this README section:
