@@ -34,4 +34,11 @@ def average_precision(retrieved: Sequence[str], relevant: Set[str], k: int) -> f
     return score / num_rel
 
 
+def mean_reciprocal_rank(retrieved: Sequence[str], relevant: Set[str]) -> float:
+    """MRR for a single query: reciprocal of rank of first relevant item."""
+    for i, doc in enumerate(retrieved, start=1):
+        if doc in relevant:
+            return 1.0 / i
+    return 0.0
+
 
