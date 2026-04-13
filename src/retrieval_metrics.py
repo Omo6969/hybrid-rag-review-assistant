@@ -42,3 +42,11 @@ def mean_reciprocal_rank(retrieved: Sequence[str], relevant: Set[str]) -> float:
     return 0.0
 
 
+def evaluate_query(retrieved: Sequence[str], relevant: Set[str], k: int = 5) -> dict:
+    """Return common metrics for a single query."""
+    return {
+        "precision@k": precision_at_k(retrieved, relevant, k),
+        "recall@k": recall_at_k(retrieved, relevant, k),
+        "avg_precision": average_precision(retrieved, relevant, k),
+        "mrr": mean_reciprocal_rank(retrieved[:k], relevant),
+    }
