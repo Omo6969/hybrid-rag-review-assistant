@@ -19,3 +19,19 @@ def recall_at_k(retrieved: Sequence[str], relevant: Set[str], k: int) -> float:
     return len(topk & relevant) / len(relevant)
 
 
+def average_precision(retrieved: Sequence[str], relevant: Set[str], k: int) -> float:
+    """Average precision up to k for a single query."""
+    if k <= 0:
+        raise ValueError("k must be >= 1")
+    num_rel = 0
+    score = 0.0
+    for i, doc in enumerate(retrieved[:k], start=1):
+        if doc in relevant:
+            num_rel += 1
+            score += num_rel / i
+    if num_rel == 0:
+        return 0.0
+    return score / num_rel
+
+
+
