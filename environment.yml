@@ -4,6 +4,7 @@ channels:
   - pytorch
 dependencies:
   - python=3.11.15
+  - pytest=9.0.2
   - pip=26.0.1
   - numpy=2.4.3
   - pandas=3.0.2
@@ -20,10 +21,6 @@ dependencies:
       - rank-bm25==0.2.2
       - sentence-transformers==5.4.0
       - python-dotenv==1.2.2
-      - transformers
-      - huggingface-hub
-      - tqdm
-      - uvicorn
       - langchain==0.3.25
       - langchain-core==0.3.59
       - langchain-groq==0.3.2
