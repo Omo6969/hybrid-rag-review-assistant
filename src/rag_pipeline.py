@@ -135,13 +135,23 @@ def build_semantic_vectorstore(
         A LangChain FAISS vectorstore ready to be used as a retriever.
     """
     embeddings = HuggingFaceEmbeddings(model_name=model_name)
-    lc_docs = [
-        Document(
-            page_content=doc["text"],
-            metadata={k: v for k, v in doc.items() if k != "text"},
+    lc_docs = []
+    for i, doc in enumerate(documents):
+        if not isinstance(doc, dict):
+            raise ValueError(
+                f"Invalid document at index {i}: expected dict, got "
+                f"{type(doc).__name__}."
+            )
+        if "text" not in doc:
+            raise ValueError(
+                f"Invalid document at index {i}: missing required key 'text'."
+            )
+        lc_docs.append(
+            Document(
+                page_content=doc["text"],
+                metadata={k: v for k, v in doc.items() if k != "text"},
+            )
         )
-        for doc in documents
-    ]
     return FAISS.from_documents(lc_docs, embeddings)
 
 
