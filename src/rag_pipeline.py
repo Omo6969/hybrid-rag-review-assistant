@@ -178,6 +178,7 @@ def build_rag_chain(
 
 # Step 1 – LLMPipeline (plain + dict-based RAG, kept for backward compat)
 
+
 class LLMPipeline:
     """Wraps a Groq-hosted Llama 3 model for plain and RAG generation.
 
