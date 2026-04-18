@@ -25,6 +25,24 @@ Example query types include:
 
 By comparing BM25 and semantic retrieval on the same query set, the project highlights the strengths and weaknesses of lexical and embedding-based search for product discovery.
 
+## RAG Pipeline Workflow
+
+```mermaid
+flowchart LR
+    Q[Query] --> T[Tokenization]
+    Q --> E[Embeddings]
+    Q --> AP[Augmented Prompt]
+
+    T --> B[BM25 Retrieval]
+    E --> VS[Vector Store]
+
+    B --> AP
+    VS --> AP
+
+    AP --> LLM[LLM]
+    LLM --> O["Output (Answer)"]
+```
+
 ## Project Goals
 
 This project aims to:
@@ -131,7 +149,6 @@ The final written discussion and observations are recorded in:
 
 - `results/milestone1_discussion.md`
 
-
 ## Installation
 
 ### 1. Clone the repository
@@ -153,10 +170,6 @@ conda activate amazon-retrieval
 ```bash
 pip install -e .
 ```
-
-## Data Setup
-
-Use this README section:
 
 ## Data Setup
 
