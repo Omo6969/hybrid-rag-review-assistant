@@ -25,3 +25,6 @@ dependencies:
       - huggingface-hub
       - tqdm
       - uvicorn
+      - langchain==0.3.25
+      - langchain-core==0.3.59
+      - langchain-groq==0.3.2
