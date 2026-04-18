@@ -24,6 +24,8 @@ dependencies:
       - langchain==0.3.25
       - langchain-core==0.3.59
       - langchain-groq==0.3.2
+      - langchain-community==0.3.24
+      - langchain-huggingface==0.1.2
       - transformers==5.5.3
       - huggingface-hub==1.10.1
       - tqdm==4.67.1
