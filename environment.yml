@@ -20,6 +20,13 @@ dependencies:
       - rank-bm25==0.2.2
       - sentence-transformers==5.4.0
       - python-dotenv==1.2.2
+      - transformers
+      - huggingface-hub
+      - tqdm
+      - uvicorn
+      - langchain==0.3.25
+      - langchain-core==0.3.59
+      - langchain-groq==0.3.2
       - transformers==5.5.3
       - huggingface-hub==1.10.1
       - tqdm==4.67.1
