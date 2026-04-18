@@ -156,10 +156,6 @@ pip install -e .
 
 ## Data Setup
 
-Use this README section:
-
-## Data Setup
-
 Raw and sampled data files are managed with the project shell scripts.
 
 ### 1. Download raw category files
@@ -327,24 +323,31 @@ results/milestone1_discussion.md
 
 ### Running the APP
 
-The application file is located at:
+The application entry file is located at:
 
 ```text
 app/app.py
 ```
 
-From the project root directory, run:
+From the project root directory and with the amazon-retrieval conda environment activated, run:
 
 ```bash
 python -m shiny run app/app.py
 ```
 
+For development, you can use reload mode:
+
+```bash
+python -m shiny run --reload app/app.py
+```
+
 After running the command, a local server will start and a link will appear in the terminal, typically:
 
-[http://127.0.0.1:8000](http://127.0.0.1:8000)
+```bash
+http://127.0.0.1:8000
+```
 
-Open this link in your browser to access the app.
-
+Open that link in your browser to use the app.
 
 ## Running the Notebooks
 
