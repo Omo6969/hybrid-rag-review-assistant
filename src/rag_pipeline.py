@@ -91,3 +91,148 @@ PROMPT_VARIANTS: dict[str, ChatPromptTemplate] = {
 }
 
 
+# Step 2 - Context builder
+
+def build_context(docs: list[Document]) -> str:
+    """Format a list of LangChain Documents into a numbered context block.
+
+    Args:
+        docs: Retrieved LangChain Document objects.
+
+    Returns:
+        A structured, prompt-ready string.
+    """
+    parts = []
+    for i, doc in enumerate(docs, 1):
+        m = doc.metadata
+        asin = m.get("parent_asin", "N/A")
+        title = m.get("title", "")
+        rating = m.get("rating", "N/A")
+        text = doc.page_content[:400]
+        parts.append(
+            f"[{i}] ASIN: {asin} | Product: {title} | Rating: {rating}/5\n{text}"
+        )
+    return "\n\n".join(parts)
+
+# Step 2 - Vectorstore builder
+
+_EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
+
+def build_semantic_vectorstore(
+    documents: list[dict],
+    model_name: str = _EMBED_MODEL,
+) -> FAISS:
+    """Build a LangChain FAISS vectorstore from a list of document dicts.
+
+    Reuses the same embedding model as Milestone 1.
+
+    Args:
+        documents: List of dicts with at least a ``"text"`` key.
+        model_name: Sentence-transformer model for embeddings.
+
+    Returns:
+        A LangChain FAISS vectorstore ready to be used as a retriever.
+    """
+    embeddings = HuggingFaceEmbeddings(model_name=model_name)
+    lc_docs = [
+        Document(
+            page_content=doc["text"],
+            metadata={k: v for k, v in doc.items() if k != "text"},
+        )
+        for doc in documents
+    ]
+    return FAISS.from_documents(lc_docs, embeddings)
+
+
+# Step 2 – LCEL RAG chain builder
+
+def build_rag_chain(
+    retriever,
+    llm: ChatGroq,
+    prompt_variant: str = "concise",
+):
+    """Build an LCEL RAG chain.
+
+    Args:
+        retriever: Any LangChain-compatible retriever (semantic or hybrid).
+        llm: An initialised ChatGroq instance.
+        prompt_variant: One of ``"minimal"``, ``"concise"``, ``"detailed"``.
+
+    Returns:
+        An LCEL chain that accepts a query string and returns an answer string.
+    """
+    if prompt_variant not in PROMPT_VARIANTS:
+        raise ValueError(
+            f"Unknown prompt_variant '{prompt_variant}'. "
+            f"Choose from: {list(PROMPT_VARIANTS)}"
+        )
+    prompt = PROMPT_VARIANTS[prompt_variant]
+    return (
+        {"context": retriever | build_context, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
+
+# Step 1 – LLMPipeline (plain + dict-based RAG, kept for backward compat)
+
+class LLMPipeline:
+    """Wraps a Groq-hosted Llama 3 model for plain and RAG generation.
+
+    This is the Step 1 interface. For the full LCEL pipeline use
+    ``build_rag_chain()`` instead.
+    """
+
+    def __init__(
+        self,
+        model: str = "llama-3.1-8b-instant",
+        temperature: float = 0.0,
+        max_tokens: int = 512,
+        api_key: Optional[str] = None,
+    ) -> None:
+        key = api_key or os.getenv("GROQ_API_KEY")
+        if not key:
+            raise ValueError(
+                "GROQ_API_KEY not found. Set it in your .env file or pass api_key=."
+            )
+        self.llm = ChatGroq(
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            api_key=key,
+        )
+        self.model = model
+
+    def generate(self, query: str, documents: Optional[list[dict]] = None) -> str:
+        """Generate an answer for *query*.
+
+        Args:
+            query: The user question.
+            documents: Optional list of retrieved review dicts (must have a
+                       ``"text"`` key). When provided, uses the RAG prompt.
+
+        Returns:
+            The model's answer as a plain string.
+        """
+        if documents:
+            context = self._build_context(documents)
+            chain = _RAG_TEMPLATE | self.llm
+            response = chain.invoke({"context": context, "question": query})
+        else:
+            chain = _PLAIN_TEMPLATE | self.llm
+            response = chain.invoke({"question": query})
+
+        return response.content.strip()
+
+    @staticmethod
+    def _build_context(documents: list[dict], max_docs: int = 5) -> str:
+        lines = []
+        for i, doc in enumerate(documents[:max_docs], 1):
+            title = doc.get("title", "")
+            text = doc.get("text", "")
+            rating = doc.get("rating", "")
+            snippet = f"{i}. [{title}] (Rating: {rating})\n   {text[:300]}"
+            lines.append(snippet)
+        return "\n\n".join(lines)
