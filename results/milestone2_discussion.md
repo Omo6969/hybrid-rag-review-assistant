@@ -33,13 +33,15 @@ The LLM pipeline is implemented in `src/rag_pipeline.py` as the `LLMPipeline` cl
 
 The class uses two separate `ChatPromptTemplate` objects to enforce different system prompts for each mode, ensuring the model correctly attributes answers to retrieved context when available.
 
----
+For Milestone 2 notebook experiments, the saved semantic and hybrid retrievers were used directly where possible to avoid rebuilding retrieval artifacts unnecessarily.
 
 ## Step 2 - Semantic RAG Pipeline
 
 ### 2.1 Retrieval
 
-The semantic retriever reuses the `sentence-transformers/all-MiniLM-L6-v2` model from Milestone 1, now wrapped as a LangChain FAISS vectorstore via `build_semantic_vectorstore()` in `src/rag_pipeline.py`. The vectorstore is converted to a LangChain retriever with `k=5` (top-5 documents per query).
+For semantic RAG experiments, the project reuses the saved `SemanticRetriever` from Milestone 1 rather than rebuilding the semantic index inside the notebook. This choice improves efficiency, reduces notebook memory overhead, and keeps the experiments aligned with the same persisted retrieval artifacts used elsewhere in the project.
+
+The semantic retriever uses the `sentence-transformers/all-MiniLM-L6-v2` model and a FAISS index built over the cleaned All Beauty retrieval documents. For each query, the retriever returns the top-`k` most semantically similar review documents, with `k=5` used in the Milestone 2 experiments.
 
 ### 2.2 Context Building
 
@@ -65,15 +67,14 @@ Three system prompt variants were evaluated on the same test queries:
 
 ### 2.4 RAG Pipeline
 
-The full pipeline is assembled with `build_rag_chain()` using LangChain LCEL pipes:
+The semantic RAG workflow was implemented as a lightweight custom pipeline for notebook experimentation. The process follows the standard RAG structure:
 
-```
-retriever | build_context -> prompt_template -> llm -> StrOutputParser
-```
+1. retrieve top-`k` supporting documents with the semantic retriever,
+2. build a structured context block from the retrieved reviews,
+3. apply a selected prompt template, and
+4. generate a grounded answer with the LLM.
 
-Both semantic and hybrid retrievers are plug-compatible with this chain.
-
----
+This approach satisfies the milestone requirement for a retrieval -> context -> prompt -> LLM workflow while remaining more efficient and stable than rebuilding a full LangChain retriever pipeline inside the notebook.
 
 ## Step 3 - Hybrid RAG Pipeline
 
@@ -98,4 +99,46 @@ RRF was chosen over simple score averaging because:
 | Intent-based ("something for dry skin") | Good - understands meaning | Similar - semantic component carries it |
 | Mixed ("fragrance-free moisturizer for sensitive skin") | Good | Best - combines both signals |
 
-The hybrid approach is most beneficial for product queries that mix specific keywords with natural language intent, which is typical of real shopping queries.
+In general, hybrid RAG was most useful for queries that combined explicit keywords with broader intent. BM25 helped recover exact term matches, while semantic retrieval improved coverage for more descriptive phrasing. As a result, hybrid retrieval often provided stronger supporting evidence for generation than semantic retrieval alone, especially on mixed-intent shopping queries.
+
+## Step 4: Qualitative Evaluation Results
+
+The Hybrid RAG workflow was manually evaluated on 5 queries from the Milestone 1 query set using the three milestone criteria:
+
+- **Accuracy** - whether the answer was factually correct based on the retrieved reviews
+- **Completeness** - whether the answer addressed all important aspects of the query
+- **Fluency** - whether the answer was natural, clear, and easy to read
+
+### 4.1 Evaluation Table
+
+| Query ID | Query | Difficulty | Accuracy | Completeness | Fluency | Notes |
+|---|---|---|---|---|---|---|
+| 1 | lip balm | easy | Yes | Yes | Yes | The answer was relevant, grounded in the retrieved reviews, and clearly written. It identified the product correctly and summarized review evidence well. |
+| 2 | face moisturizer | easy | Yes | Yes | Yes | The answer correctly identified the product type and presented the supporting review evidence in a concise and readable way. |
+| 3 | sunscreen for face | easy | Yes | Yes | Yes | The answer remained grounded in the retrieved reviews and addressed the query directly. It was both accurate and easy to understand. |
+| 4 | something for dry skin | medium | Yes | No | Yes | The answer was plausible and grounded, but the query was broader and more open-ended. The response did not fully explore multiple possible product options, so completeness was weaker. |
+| 5 | product to reduce frizzy hair | medium | Yes | No | Yes | The answer was relevant and fluent, and it reflected the retrieved review evidence. However, it did not compare alternative products or discuss trade-offs in much detail. |
+
+### 4.2 Summary of Key Observations
+
+Overall, the Hybrid RAG workflow performed well on straightforward product-search queries and produced answers that were generally accurate, fluent, and grounded in the retrieved review evidence. The strongest results were observed on easy queries such as *lip balm*, *face moisturizer*, and *sunscreen for face*, where the retrieval task was relatively direct and the generated answers remained concise and relevant.
+
+Performance was slightly weaker on broader or more descriptive queries such as *something for dry skin* and *product to reduce frizzy hair*. In these cases, the generated answers were still mostly accurate and fluent, but completeness was lower because the queries allowed multiple interpretations and the system did not always compare a range of candidate products in detail.
+
+### 4.3 Overall Reflection
+
+The Hybrid RAG workflow is performing reasonably well for Milestone 2. It successfully combines retrieval and generation so that answers are grounded in the review corpus rather than being produced without evidence. In practice, hybrid retrieval appears more robust than using a single retrieval method, since BM25 contributes exact keyword matching while semantic retrieval helps recover relevant documents even when the wording differs.
+
+### 4.4 Limitations
+
+1. The generated answers depend heavily on the quality and coverage of the retrieved reviews.  
+2. Broader or underspecified queries reduce completeness because multiple interpretations are possible.  
+3. The cleaned dataset contains limited metadata, so answers rely mainly on review text rather than richer product attributes.  
+4. The workflow does not always compare multiple candidate products in depth.
+
+### 4.5 Possible Improvements
+
+1. Improve hybrid reranking and experiment further with retrieval weights.  
+2. Add richer metadata into the context when available.  
+3. Tune retrieval depth more systematically to balance coverage and focus.  
+4. Add clearer source attribution in generated answers to strengthen transparency and grounding.
