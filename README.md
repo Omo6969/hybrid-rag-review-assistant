@@ -2,20 +2,31 @@
 
 ## Overview
 
-**Smart Amazon Product Query Assistant** is a retrieval-focused product search system built on the **Amazon Reviews 2023** dataset. The goal of the project is to retrieve relevant Amazon product-review documents from natural-language queries and compare how well different retrieval methods capture user intent.
+**Smart Amazon Product Query Assistant** is a product search and question-answering system built on the **Amazon Reviews 2023** dataset. The goal of the project is to retrieve relevant Amazon product-review documents from natural-language queries and generate grounded answers using retrieved review evidence.
 
-For **Milestone 1**, the project focuses on **retrieval only**. The system implements:
+For **Milestone 2**, the project extends beyond retrieval-only search and now includes:
 
 - **BM25** keyword-based retrieval
 - **Semantic search** using sentence embeddings and vector similarity
-- qualitative comparison of both methods on a shared query set
+- **Hybrid retrieval** combining BM25 and semantic retrieval
+- **Retrieval-Augmented Generation (RAG)** for grounded product question answering
+- **Prompt experimentation** across multiple prompt variants
+- **Qualitative evaluation** of generated answers using accuracy, completeness, and fluency
 
 The project initially explored two categories:
 
 - **All_Beauty**
 - **Health_and_Personal_Care**
 
-After exploratory analysis, **All_Beauty** was selected as the primary category for Milestone 1 retrieval experiments.
+After exploratory analysis, **All_Beauty** was selected as the primary category for Milestone 1 and retained for Milestone 2.
+
+Example query types include:
+
+> "fragrance-free moisturizer for sensitive skin"  
+> "gentle makeup remover"  
+> "skin care product for very dry lips in winter"
+
+By comparing BM25, semantic retrieval, and hybrid retrieval, and then grounding generated answers in retrieved review context, the project highlights how retrieval and generation can work together for product discovery and question answering.
 
 Example query types include:
 
@@ -27,31 +38,61 @@ By comparing BM25 and semantic retrieval on the same query set, the project high
 
 ## RAG Pipeline Workflow
 
+## RAG Pipeline Workflow
+
 ```mermaid
 flowchart LR
-    Q[Query] --> T[Tokenization]
-    Q --> E[Embeddings]
-    Q --> AP[Augmented Prompt]
+    Q[User Query] --> R1[BM25 Retriever]
+    Q --> R2[Semantic Retriever]
+    R1 --> H[Hybrid Retriever / RRF Fusion]
+    R2 --> H
+    R2 --> S[Semantic RAG Retriever]
 
-    T --> B[BM25 Retrieval]
-    E --> VS[Vector Store]
+    S --> C1[Context Builder]
+    H --> C2[Context Builder]
 
-    B --> AP
-    VS --> AP
+    C1 --> P1[Prompt Template]
+    C2 --> P2[Prompt Template]
 
-    AP --> LLM[LLM]
-    LLM --> O["Output (Answer)"]
+    P1 --> LLM[Groq Llama 3.1 8B Instant]
+    P2 --> LLM
+
+    LLM --> A[Generated Answer]
+    H --> D[Retrieved Supporting Documents]
+    S --> D
+
 ```
+
+### Workflow summary
+
+The Milestone 2 system supports two retrieval-and-generation paths:
+
+1. Semantic RAG
+    - embeds the query
+    - retrieves relevant documents from a FAISS vector store
+    - builds a structured context block
+    - sends the context and query to the LLM
+2. Hybrid RAG
+    - retrieves documents with both BM25 and semantic retrieval
+    - combines rankings using weighted Reciprocal Rank Fusion (RRF)
+    - builds a structured context block from the fused results
+    - sends the context and query to the LLM
+
+In both cases, the LLM is instructed to answer using only the retrieved review evidence.
 
 ## Project Goals
 
 This project aims to:
 
-- build a reproducible retrieval pipeline on Amazon review and metadata files
-- compare **keyword-based** and **semantic** retrieval approaches
-- evaluate retrieval quality qualitatively across different query types
-- prepare retrieval outputs for later app integration
+- build a reproducible retrieval pipeline on Amazon review data
+- compare **keyword-based**, **semantic**, and **hybrid** retrieval approaches
+- build a grounded **RAG pipeline** for product question answering
+- evaluate retrieval and answer quality qualitatively across different query types
+- expose both retrieval-only and RAG workflows through a user-facing web app
 
+## Major Repository Structure
+
+```text
 ## Major Repository Structure
 
 ```text
@@ -63,17 +104,23 @@ DSCI_575_project_omo001_deepray/
 ├── .gitignore
 │
 ├── data/
-│   ├── raw/                   # downloaded Amazon .jsonl/.jsonl.gz files (gitignored)
-│   └── processed/             # cleaned datasets and saved retrieval artifacts (gitignored)
+│   ├── raw/                        # downloaded Amazon files (gitignored)
+│   └── processed/                  # cleaned datasets and saved retriever artifacts (gitignored)
 │
 ├── notebooks/
+│   ├── milestone1_exploration.ipynb
 │   ├── milestone1_evaluation.ipynb
-│   └── milestone1_exploration.ipynb
+│   └── milestone2_rag.ipynb
+│
+├── app/
+│   └── app.py
 │
 ├── src/
 │   ├── __init__.py
 │   ├── bm25.py
 │   ├── semantic.py
+│   ├── hybrid.py
+│   ├── rag_pipeline.py
 │   ├── preprocessing.py
 │   └── utils/
 │       ├── __init__.py
@@ -81,7 +128,8 @@ DSCI_575_project_omo001_deepray/
 │       └── preprocessing.py
 │
 ├── results/
-│   └── milestone1_discussion.md
+│   ├── milestone1_discussion.md
+│   └── milestone2_discussion.md
 │
 └── scripts/
     ├── make_datasets.py
@@ -105,7 +153,7 @@ The final retrieval pipeline for Milestone 1 uses the **All_Beauty** category:
 
 These files should be stored in `data/raw/` and should not be committed to Git.
 
-## Retrieval Workflow
+## Milestone 2 Workflow
 
 ### 1. Data exploration and preprocessing
 
@@ -117,7 +165,7 @@ In `notebooks/milestone1_exploration.ipynb`, the project:
 - justifies the selected retrieval fields
 - explains preprocessing decisions
 
-The final processed retrieval dataset is built separately using `scripts/make_datasets.py`, rather than depending on notebook execution.
+The final processed retrieval dataset is built separately using `scripts/make_datasets.py`.
 
 ### 2. BM25 retrieval
 
@@ -136,6 +184,40 @@ The semantic retrieval pipeline:
 - indexes them with FAISS
 - retrieves semantically similar results for natural-language queries
 - saves reusable semantic retrieval artifacts to disk
+
+### 4. Hybrid retrieval
+
+The hybrid retriever:
+
+- reuses BM25 and semantic retrieval outputs
+- combines rankings using **weighted Reciprocal Rank Fusion (RRF)**
+- removes duplicates across retrieval methods
+- returns fused top-ranked documents for downstream use
+
+### 5. RAG pipeline
+
+The RAG pipeline:
+
+- retrieves top-ranked supporting documents
+- formats them into a structured prompt context
+- applies one of several prompt variants
+- uses a Groq-hosted Llama model to generate grounded answers
+
+### 6. Qualitative evaluation
+
+Milestone 2 evaluates generated answers manually on selected queries from Milestone 1 using:
+
+- **Accuracy**
+- **Completeness**
+- **Fluency**
+
+The exploratory notebook for this workflow is:
+
+- `notebooks/milestone2_rag.ipynb`
+
+The final written discussion is recorded in:
+
+- `results/milestone2_discussion.md`
 
 ### 4. Qualitative evaluation
 
@@ -170,6 +252,22 @@ conda activate amazon-retrieval
 ```bash
 pip install -e .
 ```
+
+## Environment Variables
+
+Milestone 2 uses a Groq-hosted LLM for answer generation. Create a `.env` file in the project root and add:
+
+```bash
+GROQ_API_KEY=your_groq_api_key_here
+```
+
+This is required for:
+
+- `src/rag_pipeline.py`
+- `notebooks/milestone2_rag.ipynb`
+- `app/app.py` when running in RAG Mode
+
+Never commit secrets to Git.
 
 ## Data Setup
 
@@ -316,26 +414,29 @@ This saves semantic retrieval artifacts under:
 data/processed/semantic_index/
 ```
 
-These saved artifacts make later runs faster because the retrievers can be loaded instead of rebuilt.
+These saved artifacts are reused in both the notebook and the app. If the saved retrievers already exist, they can be loaded directly instead of rebuilt, which makes experimentation and app startup faster.
 
-### Qualitative Evaluation
+### Milestone 2 Evaluation
 
-Open the evaluation notebook:
+Open the RAG notebook:
 
 ```text
-notebooks/milestone1_evaluation.ipynb
+notebooks/milestone2_rag.ipynb
 ```
 
 Run all cells in the notebook to:
 
-- execute BM25 retrieval
-- execute semantic retrieval
-- generate top-5 results for each query
+- load the cleaned All Beauty retrieval dataset
+- instantiate BM25, semantic, and hybrid retrievers
+- compare retrieval outputs on representative queries
+- compare prompt variants
+- run semantic RAG and hybrid RAG examples
+- prepare qualitative evaluation outputs for selected queries
 
-The outputs displayed in the notebook correspond to the comparisons documented in:
+The final Milestone 2 write-up is documented in:
 
 ```text
-results/milestone1_discussion.md
+results/milestone2_discussion.md
 ```
 
 ### Running the APP
@@ -346,7 +447,7 @@ The application entry file is located at:
 app/app.py
 ```
 
-From the project root directory and with the amazon-retrieval conda environment activated, run:
+From the project root directory and with the environment activated, run:
 
 ```bash
 python -m shiny run app/app.py
@@ -366,9 +467,38 @@ http://127.0.0.1:8000
 
 Open that link in your browser to use the app.
 
+#### App modes
+
+The Milestone 2 app supports two top-level modes:
+
+- Search Only
+- RAG Mode
+
+#### Search Only
+
+Supports:
+
+- BM25
+- Semantic
+- Hybrid
+
+This mode displays retrieved review documents only.
+
+#### RAG Mode
+
+Supports:
+
+- Semantic RAG
+- Hybrid RAG
+
+This mode displays:
+
+- a generated answer grounded in retrieved review context
+- the supporting retrieved documents shown below the answer
+
 ## Running the Notebooks
 
-You can run the notebook in VScode (with Jupyter-related extensions installed) or Start Jupyter:
+You can run the notebooks in VS Code with Jupyter support, or launch Jupyter Lab:
 
 ```bash
 jupyter lab
@@ -380,13 +510,20 @@ Then open:
 notebooks/milestone1_exploration.ipynb
 ```
 
-for exploratory analysis and preprocessing decisions, and:
+for exploratory analysis and preprocessing decisions,
 
 ```text
 notebooks/milestone1_evaluation.ipynb
 ```
 
-for retrieval comparison and qualitative evaluation.
+for retrieval comparison and qualitative evaluation, and:
+
+```text
+notebooks/milestone2_rag.ipynb
+```
+
+for Milestone 2 RAG exploration, prompt exp
+eriments, semantic vs hybrid RAG comparison, and qualitative evaluation preparation.
 
 ## Reproducibility Notes
 
@@ -394,21 +531,39 @@ To reproduce this project successfully:
 
 - create the environment from `environment.yml`
 - install the project with `pip install -e .`
+- install the Milestone 2 LangChain and Groq dependencies if needed
+- create a `.env` file with `GROQ_API_KEY`
 - place the raw dataset files in `data/raw/`
-- run `src/scripts/make_datasets.py` to build the cleaned dataset
+- run `scripts/make_datasets.py` to build the cleaned dataset
 - run the BM25 and semantic indexing scripts to save retrieval artifacts
-- open the notebooks as needed for EDA and evaluation
+- open `notebooks/milestone2_rag.ipynb` for Milestone 2 exploration
+- run `app/app.py` to use the retrieval and RAG interface
 - keep raw data and secrets out of version control
+
+## Testing
+
+Run the test suite with:
+
+```bash
+pytest
+```
+
+You can also run a specific test module, for example:
+
+```bash
+pytest tests/test_hybrid.py -q
+```
 
 ## Current Milestone Scope
 
-This repository currently targets **Milestone 1**, which focuses on:
+This repository currently targets **Milestone 2**, which focuses on:
 
-- retrieval foundations
-- qualitative evaluation
-- reproducible indexing workflows
-
-This milestone does **not** use LLMs yet.
+- semantic retrieval for RAG
+- hybrid retrieval using BM25 + semantic search
+- grounded answer generation with an LLM
+- prompt experimentation
+- qualitative evaluation of generated answers
+- an updated app supporting both retrieval-only and RAG workflows
 
 ## Contributors
 
