@@ -170,11 +170,6 @@ def simple_clean(text: object) -> str:
     return cleaned.strip()
 
 
-import pandas as pd
-
-from src.utils.preprocessing import tokenize_text, normalize_text
-
-
 def build_retrieval_dataframe(
     reviews_df: pd.DataFrame,
     meta_df: pd.DataFrame,
