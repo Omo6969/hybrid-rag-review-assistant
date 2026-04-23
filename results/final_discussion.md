@@ -18,7 +18,6 @@ The cleaned All Beauty dataset contains **701,092 records**, which already excee
 Both models were tested under identical conditions: same retriever (semantic, k=5), same prompt
 template, temperature=0.0, max_tokens=512.
 
-
 #### Prompt used
 
 **System:**
@@ -35,12 +34,10 @@ template, temperature=0.0, max_tokens=512.
 Retrieved context: top-5 documents from the semantic retriever, formatted as numbered blocks
 containing ASIN, product title, star rating, and up to 400 characters of review text.
 
-
 #### Results
 
 Five queries spanning different difficulty levels were run through both models with identical
 retrieved context.
-
 
 **Query 1: Keyword-exact:** *What lip balm works best for extremely dry, chapped lips?*
 
@@ -58,7 +55,6 @@ retrieved context.
 > Reviewers describe them as "the best", "heals", "must have", "most moisturizing", and "the only one
 > that works". However, the specific product names are not mentioned in the reviews, only the ASIN numbers.
 
-
 **Query 2: Vague intent:** *something for sensitive skin that won't break me out*
 
 **llama-3.1-8b-instant:**
@@ -75,7 +71,6 @@ retrieved context.
 > - ASIN: B08RNQNFW1 (Rating: 5/5)
 > - ASIN: B08L3J4FB9 (Rating: 5/5)
 
-
 **Query 3: Multi-condition:** *fragrance-free moisturizer that also has SPF protection*
 
 **llama-3.1-8b-instant:**
@@ -88,7 +83,6 @@ retrieved context.
 > Review [4] mentions a fragrance-free moisturizer, but it does not have SPF protection.
 >
 > Only review [1] meets the fragrance-free requirement and has SPF, but the SPF value is not specified.
-
 
 **Query 4: Product comparison:** *Is Burt's Bees or EOS better for dry lips?*
 
@@ -106,7 +100,6 @@ retrieved context.
 > mentions that EOS did not work for the reviewer's sensitive lips. Overall, the reviews do not provide
 > a clear answer to which one is better for dry lips.
 
-
 **Query 5: Negative filter:** *hair serum that doesn't make hair greasy or weigh it down*
 
 **llama-3.1-8b-instant:**
@@ -120,35 +113,28 @@ retrieved context.
 > Reviews [1], [2], [3] and [5] mention that the hair serum does not make hair greasy or weigh it down.
 > The ASINs for these products are B000TFW8WE, B00XDB3QTA, B08PPZLSYT.
 
-
 #### Discussion
 
 | Dimension | llama-3.1-8b-instant (8B) | llama-3.3-70b-versatile (70B) |
 | --------- | ------------------------- | ----------------------------- |
-| **Factual grounding** | Stays grounded; lists ASINs and quoted review snippets | Stays grounded; references reviews by number |
-| **Multi-condition queries** | Flatly states no product meets criteria (Q3) | Analyses each condition separately and identifies partial matches |
-| **Product comparisons** | Stops at "neither is mentioned" without digging deeper (Q4) | Traces what each review says about each brand; more balanced |
-| **Negative-filter queries** | Lists products that meet the constraint but without explanation | Same products; slightly more concise |
-| **Handling retrieval gaps** | Sometimes gives a bare "no product found" | Explains why no product fully qualifies and what is available |
-| **Response style** | Bullet lists with quoted review titles | Numbered review references; slightly more analytical prose |
+| **Factual grounding** | Stays grounded; often gives direct product-style answers with ASINs and brief evidence | Stays grounded; tends to reference reviews more cautiously and synthesise across them |
+| **Multi-condition queries** | Simpler handling; may stop at "no product found" without unpacking partial matches | Stronger; analyses each condition separately and identifies partial matches |
+| **Product comparisons** | More likely to stop at the lack of a direct comparison | More likely to integrate evidence across multiple reviews and explain why the comparison remains inconclusive |
+| **Simple shopping queries** | Often more direct and actionable | Still grounded, but sometimes less helpful because it is more cautious than necessary |
+| **Negative-filter queries** | Clear and concise | Similar overall, with slightly more explicit multi-review synthesis |
+| **Handling retrieval gaps** | Can be terse when evidence is incomplete | Better at explaining what is missing from the evidence |
+| **Response style** | Direct, list-oriented, shopping-assistant style | More analytical, cautious, and synthesis-oriented |
 | **Latency (Groq free tier)** | ~0.5–1 s | ~2–4 s |
 
-The key difference appears on queries that require reasoning across multiple retrieved documents
-(Query3, Query4). The 8B model often stops at the first relevant signal, the 70B model synthesises across
-all five retrieved reviews and acknowledges nuance, for example, correctly identifying that no
-single retrieved review fully satisfies both "fragrance-free" and "has SPF" simultaneously.
+The clearest advantage of the 70B model appears on queries that require reasoning across multiple retrieved documents, especially Query 3 and Query 4. In these cases, the 70B model synthesises evidence more carefully and is more transparent about partial matches and uncertainty.
 
-For simple, one-condition queries (Query1, Query5) both models perform similarly, listing relevant ASINs
-and brief justifications from the reviews.
-
+For simpler shopping-style queries, the 8B model is sometimes more immediately useful because it produces direct and actionable answers. However, the 70B model is stronger overall when the query requires multi-document reasoning, handling ambiguity, or explaining why the retrieved evidence is incomplete.
 
 #### Model chosen
 
 **`llama-3.3-70b-versatile` is adopted as the new default.**
 
-The 70B model demonstrates more careful multi-document reasoning and is more transparent about
-gaps in the retrieved context. The latency penalty (2–4 s vs 0.5–1 s) is acceptable for an
-interactive shopping assistant. Both models are available on Groq's free tier at no cost.
+Although the 8B model performs well on straightforward queries and can be more direct in shopping-style responses, the 70B model demonstrates stronger reasoning across multiple retrieved reviews and is more transparent about gaps or ambiguity in the evidence. That makes it the better default for the final RAG pipeline, where grounded reasoning is more important than minimal latency.
 
 ## Step 2: Additional Feature (Option 1: Quantitative Evaluation)
 
@@ -179,18 +165,22 @@ The quantitative evaluation shows that **Hybrid retrieval** achieved the stronge
 
 ### Documentation Update
 
-- Summary of `README` improvements
+The documentation was updated to make the repository clearer, more complete, and easier to reproduce. The `README.md` was revised to reflect the final project scope rather than only the earlier milestones. In particular, it now describes the retrieval and RAG workflow, the hybrid retriever, the updated application modes, the evaluation workflow, and the required environment setup. The README also includes clearer run instructions for the notebooks and app, updated repository structure, and guidance for using environment variables through `.env` and `.env.example`.
 
 ### Code Quality Changes
 
-- Summary of cleanups
+Several code quality and reproducibility improvements were made in the final submission. File handling was standardized using `pathlib.Path` rather than hardcoded paths where possible. API keys were kept out of source code and moved to environment variables. Function docstrings were added or improved across the codebase, including retrieval and RAG components. The project dependencies were updated to support the final RAG workflow and model experimentation. The notebook workflow was also simplified to reuse saved retrieval artifacts when available, which reduced unnecessary recomputation and improved stability during experimentation.
 
 ## Step 4: Cloud Deployment Plan
 
-(See Step 4 above for required subsections)
-The pipeline already operates on the full All_Beauty category from the Amazon Reviews 2023
-dataset. No changes to sampling strategy were needed.
+### Data Storage
 
-- Number of products indexed: 701,092 review documents
-- Both indices (BM25 and FAISS semantic) were built from this full corpus during Milestone 1
-  using `src/scripts/build_bm25_index.py` and `src/scripts/build_semantic_index.py`
+For a cloud deployment on AWS, the raw Amazon review files would be stored in **Amazon S3** because they are large, static, and naturally suited to object storage. The processed datasets, including cleaned parquet and JSONL outputs, would also be stored in **S3**. The semantic vector index and BM25 index could likewise be stored in **S3** as versioned retrieval artifacts and loaded by the application at startup. This approach keeps storage simple, scalable, and decoupled from the application itself.
+
+### Compute
+
+The application could run on **AWS App Runner**, **ECS**, or a small **EC2** instance, depending on the desired level of operational complexity. For a lightweight deployment, App Runner would be attractive because it simplifies containerized web app deployment. If more control or scaling flexibility were needed, ECS would be a stronger option. Multiple users could be handled through horizontal scaling of application instances behind a load balancer. LLM inference would remain **API-based** rather than self-hosted, since using a hosted LLM API reduces the complexity and cost of running GPU-backed inference infrastructure.
+
+### Streaming / Updates
+
+New products or updated review files could be incorporated through a scheduled batch update pipeline. New raw data would first be uploaded to **S3**, then processed through a recurring job that rebuilds or refreshes the cleaned dataset and retrieval artifacts. A scheduler such as a cron job, GitHub Actions workflow, or a cloud-native scheduling service could trigger these updates automatically. This would allow the production system to stay current without requiring manual rebuilding of the full pipeline each time new data becomes available.
