@@ -268,31 +268,21 @@ class LLMPipeline:
         return response.content.strip()
 
     @staticmethod
-    def build_context(docs: list[Document]) -> str:
-        """Format retrieved LangChain documents into a structured context block.
+    def _build_context(documents: list[dict], max_docs: int = 5) -> str:
+        """_summary_
 
-        Parameters
-        ----------
-        docs : list of langchain_core.documents.Document
-            Retrieved LangChain documents.
+        Args:
+            documents (list[dict]): _description_
+            max_docs (int, optional): _description_. Defaults to 5.
 
-        Returns
-        -------
-        str
-            A prompt-ready context string containing document number, ASIN,
-            product title, rating, and a truncated review snippet.
+        Returns:
+            str: _description_
         """
-        parts: list[str] = []
-
-        for i, doc in enumerate(docs, 1):
-            metadata = doc.metadata
-            asin = metadata.get("parent_asin", "N/A")
-            title = metadata.get("title", metadata.get("product_title", ""))
-            rating = metadata.get("rating", "N/A")
-            text = doc.page_content[:400]
-
-            parts.append(
-                f"[{i}] ASIN: {asin} | Product: {title} | Rating: {rating}/5\n{text}"
-            )
-
-        return "\n\n".join(parts)
+        lines = []
+        for i, doc in enumerate(documents[:max_docs], 1):
+            title = doc.get("title", "")
+            text = doc.get("text", "")
+            rating = doc.get("rating", "")
+            snippet = f"{i}. [{title}] (Rating: {rating})\n   {text[:300]}"
+            lines.append(snippet)
+        return "\n\n".join(lines)

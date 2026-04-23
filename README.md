@@ -2,23 +2,25 @@
 
 ## Overview
 
-**Smart Amazon Product Query Assistant** is a product search and question-answering system built on the **Amazon Reviews 2023** dataset. The goal of the project is to retrieve relevant Amazon product-review documents from natural-language queries and generate grounded answers using retrieved review evidence.
+**Smart Amazon Product Query Assistant** is a product search and question-answering system built on the **Amazon Reviews 2023** dataset. The project retrieves relevant Amazon product-review documents from natural-language queries and generates grounded answers using retrieved review evidence.
 
-For **Milestone 2**, the project extends beyond retrieval-only search and now includes:
+By the **final submission**, the system includes:
 
 - **BM25** keyword-based retrieval
 - **Semantic search** using sentence embeddings and vector similarity
-- **Hybrid retrieval** combining BM25 and semantic retrieval
+- **Hybrid retrieval** combining BM25 and semantic retrieval with rank fusion
 - **Retrieval-Augmented Generation (RAG)** for grounded product question answering
 - **Prompt experimentation** across multiple prompt variants
 - **Qualitative evaluation** of generated answers using accuracy, completeness, and fluency
+- **Quantitative evaluation** using retrieval metrics such as precision@k and recall@k
+- An improved interactive app supporting both **Search Only** and **RAG Mode**
 
 The project initially explored two categories:
 
 - **All_Beauty**
 - **Health_and_Personal_Care**
 
-After exploratory analysis, **All_Beauty** was selected as the primary category for Milestone 1 and retained for Milestone 2.
+After exploratory analysis, **All_Beauty** was selected as the primary category and retained throughout the retrieval and RAG workflow. The final system operates on a substantially scaled cleaned All Beauty dataset containing **701,092 records**, well above the project minimum requirement.
 
 Example query types include:
 
@@ -26,17 +28,7 @@ Example query types include:
 > "gentle makeup remover"  
 > "skin care product for very dry lips in winter"
 
-By comparing BM25, semantic retrieval, and hybrid retrieval, and then grounding generated answers in retrieved review context, the project highlights how retrieval and generation can work together for product discovery and question answering.
-
-Example query types include:
-
-> "fragrance-free moisturizer for sensitive skin"  
-> "gentle makeup remover"  
-> "skin care product for very dry lips in winter"
-
-By comparing BM25 and semantic retrieval on the same query set, the project highlights the strengths and weaknesses of lexical and embedding-based search for product discovery.
-
-## RAG Pipeline Workflow
+By combining lexical retrieval, semantic retrieval, hybrid ranking, and grounded answer generation, the project demonstrates how retrieval and generation can work together for product discovery, product comparison, and review-based question answering. The final submission also emphasizes reproducibility, improved documentation, code quality, and a practical cloud deployment plan.
 
 ## RAG Pipeline Workflow
 
@@ -54,29 +46,30 @@ flowchart LR
     C1 --> P1[Prompt Template]
     C2 --> P2[Prompt Template]
 
-    P1 --> LLM[Groq Llama 3.1 8B Instant]
+    P1 --> LLM[Groq-hosted LLM]
     P2 --> LLM
 
     LLM --> A[Generated Answer]
     H --> D[Retrieved Supporting Documents]
     S --> D
-
 ```
 
 ### Workflow summary
 
-The Milestone 2 system supports two retrieval-and-generation paths:
+The system supports two retrieval-and-generation paths:
 
 1. Semantic RAG
-    - embeds the query
-    - retrieves relevant documents from a FAISS vector store
-    - builds a structured context block
-    - sends the context and query to the LLM
+
+- retrieves relevant documents with the semantic - retriever
+- builds a structured context block
+- sends the context and query to the LLM
+
 2. Hybrid RAG
-    - retrieves documents with both BM25 and semantic retrieval
-    - combines rankings using weighted Reciprocal Rank Fusion (RRF)
-    - builds a structured context block from the fused results
-    - sends the context and query to the LLM
+
+- retrieves documents with both BM25 and semantic retrieval
+- combines rankings using weighted Reciprocal Rank Fusion (RRF)
+- builds a structured context block from the fused results
+- sends the context and query to the LLM
 
 In both cases, the LLM is instructed to answer using only the retrieved review evidence.
 
@@ -93,15 +86,13 @@ This project aims to:
 ## Major Repository Structure
 
 ```text
-## Major Repository Structure
-
-```text
 DSCI_575_project_omo001_deepray/
 │
 ├── README.md
 ├── environment.yml
 ├── pyproject.toml
 ├── .gitignore
+├── .env.example
 │
 ├── data/
 │   ├── raw/                        # downloaded Amazon files (gitignored)
@@ -110,7 +101,9 @@ DSCI_575_project_omo001_deepray/
 ├── notebooks/
 │   ├── milestone1_exploration.ipynb
 │   ├── milestone1_evaluation.ipynb
-│   └── milestone2_rag.ipynb
+│   ├── milestone2_rag.ipynb
+│   ├── final_llm_experiment.ipynb
+│   └── final_evaluation.ipynb
 │
 ├── app/
 │   └── app.py
@@ -124,12 +117,15 @@ DSCI_575_project_omo001_deepray/
 │   ├── preprocessing.py
 │   └── utils/
 │       ├── __init__.py
+│       ├── evaluation.py
 │       ├── io.py
-│       └── preprocessing.py
+│       ├── preprocessing.py
+│       └── retriever_loading.py
 │
 ├── results/
 │   ├── milestone1_discussion.md
-│   └── milestone2_discussion.md
+│   ├── milestone2_discussion.md
+│   └── final_discussion.md
 │
 └── scripts/
     ├── make_datasets.py
@@ -255,17 +251,35 @@ pip install -e .
 
 ## Environment Variables
 
-Milestone 2 uses a Groq-hosted LLM for answer generation. Create a `.env` file in the project root and add:
+A `.env.example` file is provided in the project root. Copy it to `.env` and update the values before running the RAG pipeline or app.
+
+**On macOS/Linux:**
+
+```bash
+cp .env.example .env
+```
+
+**On Windows PowerShell:**
+
+```bash
+Copy-Item .env.example .env
+```
+
+Then edit .env so it includes your Groq credentials and model selection:
 
 ```bash
 GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=your_default_groq_model_here
 ```
 
-This is required for:
+These variables are used by:
 
 - `src/rag_pipeline.py`
 - `notebooks/milestone2_rag.ipynb`
+- `notebooks/final_llm_experiment.ipynb`
 - `app/app.py` when running in RAG Mode
+
+`GROQ_MODEL` controls the default model used for answer generation.
 
 Never commit secrets to Git.
 
@@ -469,7 +483,7 @@ Open that link in your browser to use the app.
 
 #### App modes
 
-The Milestone 2 app supports two top-level modes:
+The app supports two top-level modes:
 
 - Search Only
 - RAG Mode
@@ -495,6 +509,12 @@ This mode displays:
 
 - a generated answer grounded in retrieved review context
 - the supporting retrieved documents shown below the answer
+
+### App Preview
+
+![Amazon Product Query Assistant app interface showing Search Only and RAG modes](assets/img/the_app.png)
+
+*Figure: The Smart Amazon Product Query Assistant interface.*
 
 ## Running the Notebooks
 
@@ -522,8 +542,19 @@ for retrieval comparison and qualitative evaluation, and:
 notebooks/milestone2_rag.ipynb
 ```
 
-for Milestone 2 RAG exploration, prompt exp
-eriments, semantic vs hybrid RAG comparison, and qualitative evaluation preparation.
+for Milestone 2 RAG exploration, prompt experiments, semantic vs hybrid RAG comparison, and qualitative evaluation preparation.
+
+```text
+notebooks/final_llm_experiment.ipynb
+```
+
+for comparing two LLMs on identical retrieved context and prompts for final model selection.
+
+```text
+notebooks/final_evaluation.ipynb
+```
+
+for running quantitative retrieval evaluation with precision@k and recall@k on labeled queries
 
 ## Reproducibility Notes
 
@@ -531,12 +562,11 @@ To reproduce this project successfully:
 
 - create the environment from `environment.yml`
 - install the project with `pip install -e .`
-- install the Milestone 2 LangChain and Groq dependencies if needed
-- create a `.env` file with `GROQ_API_KEY`
+- copy `.env.example` to `.env`
+- set `GROQ_API_KEY` and `GROQ_MODEL`
 - place the raw dataset files in `data/raw/`
 - run `scripts/make_datasets.py` to build the cleaned dataset
 - run the BM25 and semantic indexing scripts to save retrieval artifacts
-- open `notebooks/milestone2_rag.ipynb` for Milestone 2 exploration
 - run `app/app.py` to use the retrieval and RAG interface
 - keep raw data and secrets out of version control
 
@@ -556,14 +586,13 @@ pytest tests/test_hybrid.py -q
 
 ## Current Milestone Scope
 
-This repository currently targets **Milestone 2**, which focuses on:
+This repository now targets the **final submission**, which builds on Milestones 1 and 2 and adds:
 
-- semantic retrieval for RAG
-- hybrid retrieval using BM25 + semantic search
-- grounded answer generation with an LLM
-- prompt experimentation
-- qualitative evaluation of generated answers
-- an updated app supporting both retrieval-only and RAG workflows
+- larger-scale retrieval over the cleaned All Beauty dataset
+- additional model experimentation
+- one additional feature beyond the Milestone 2 baseline
+- improved documentation, reproducibility, and code quality
+- a cloud deployment plan documented in `results/final_discussion.md`
 
 ## Contributors
 
