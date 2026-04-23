@@ -114,44 +114,55 @@ def build_context(docs: list[Document]) -> str:
         )
     return "\n\n".join(parts)
 
+
 # Step 2 - Vectorstore builder
 
 _EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 def build_semantic_vectorstore(
-    documents: list[dict],
+    documents: list[dict[str, object]],
     model_name: str = _EMBED_MODEL,
 ) -> FAISS:
-    """Build a LangChain FAISS vectorstore from a list of document dicts.
+    """Build a LangChain FAISS vector store from retrieval document dictionaries.
 
-    Reuses the same embedding model as Milestone 1.
+    Parameters
+    ----------
+    documents : list of dict of str to object
+        Retrieval documents. Each document must include a ``"text"`` key.
+    model_name : str, default="sentence-transformers/all-MiniLM-L6-v2"
+        Sentence-transformer model name used for embeddings.
 
-    Args:
-        documents: List of dicts with at least a ``"text"`` key.
-        model_name: Sentence-transformer model for embeddings.
+    Returns
+    -------
+    langchain_community.vectorstores.FAISS
+        A LangChain FAISS vector store ready for use as a retriever.
 
-    Returns:
-        A LangChain FAISS vectorstore ready to be used as a retriever.
+    Raises
+    ------
+    ValueError
+        If a document is not a dictionary or does not contain a ``"text"`` key.
     """
     embeddings = HuggingFaceEmbeddings(model_name=model_name)
-    lc_docs = []
+    lc_docs: list[Document] = []
+
     for i, doc in enumerate(documents):
         if not isinstance(doc, dict):
             raise ValueError(
-                f"Invalid document at index {i}: expected dict, got "
-                f"{type(doc).__name__}."
+                f"Invalid document at index {i}: expected dict, got {type(doc).__name__}."
             )
         if "text" not in doc:
             raise ValueError(
                 f"Invalid document at index {i}: missing required key 'text'."
             )
+
         lc_docs.append(
             Document(
-                page_content=doc["text"],
+                page_content=str(doc["text"]),
                 metadata={k: v for k, v in doc.items() if k != "text"},
             )
         )
+
     return FAISS.from_documents(lc_docs, embeddings)
 
 
@@ -164,20 +175,34 @@ def build_rag_chain(
 ):
     """Build an LCEL RAG chain.
 
-    Args:
-        retriever: Any LangChain-compatible retriever (semantic or hybrid).
-        llm: An initialised ChatGroq instance.
-        prompt_variant: One of ``"minimal"``, ``"concise"``, ``"detailed"``.
+    Parameters
+    ----------
+    retriever : Any
+        LangChain-compatible retriever that returns LangChain documents.
+    llm : ChatGroq
+        Initialised Groq chat model.
+    prompt_variant : str, default="concise"
+        Prompt variant name. Must be one of ``"minimal"``, ``"concise"``,
+        or ``"detailed"``.
 
-    Returns:
+    Returns
+    -------
+    Any
         An LCEL chain that accepts a query string and returns an answer string.
+
+    Raises
+    ------
+    ValueError
+        If ``prompt_variant`` is not one of the supported prompt variants.
     """
     if prompt_variant not in PROMPT_VARIANTS:
         raise ValueError(
             f"Unknown prompt_variant '{prompt_variant}'. "
             f"Choose from: {list(PROMPT_VARIANTS)}"
         )
+
     prompt = PROMPT_VARIANTS[prompt_variant]
+
     return (
         {"context": retriever | build_context, "question": RunnablePassthrough()}
         | prompt
@@ -217,15 +242,20 @@ class LLMPipeline:
         self.model = model
 
     def generate(self, query: str, documents: Optional[list[dict]] = None) -> str:
-        """Generate an answer for *query*.
+        """Generate an answer for a user query.
 
-        Args:
-            query: The user question.
-            documents: Optional list of retrieved review dicts (must have a
-                       ``"text"`` key). When provided, uses the RAG prompt.
+        Parameters
+        ----------
+        query : str
+            The user question.
+        documents : list of dict or None, default=None
+            Optional retrieved review documents. When provided, generation is
+            grounded in the supplied context.
 
-        Returns:
-            The model's answer as a plain string.
+        Returns
+        -------
+        str
+            The generated answer as a plain string.
         """
         if documents:
             context = self._build_context(documents)
@@ -238,12 +268,31 @@ class LLMPipeline:
         return response.content.strip()
 
     @staticmethod
-    def _build_context(documents: list[dict], max_docs: int = 5) -> str:
-        lines = []
-        for i, doc in enumerate(documents[:max_docs], 1):
-            title = doc.get("title", "")
-            text = doc.get("text", "")
-            rating = doc.get("rating", "")
-            snippet = f"{i}. [{title}] (Rating: {rating})\n   {text[:300]}"
-            lines.append(snippet)
-        return "\n\n".join(lines)
+    def build_context(docs: list[Document]) -> str:
+        """Format retrieved LangChain documents into a structured context block.
+
+        Parameters
+        ----------
+        docs : list of langchain_core.documents.Document
+            Retrieved LangChain documents.
+
+        Returns
+        -------
+        str
+            A prompt-ready context string containing document number, ASIN,
+            product title, rating, and a truncated review snippet.
+        """
+        parts: list[str] = []
+
+        for i, doc in enumerate(docs, 1):
+            metadata = doc.metadata
+            asin = metadata.get("parent_asin", "N/A")
+            title = metadata.get("title", metadata.get("product_title", ""))
+            rating = metadata.get("rating", "N/A")
+            text = doc.page_content[:400]
+
+            parts.append(
+                f"[{i}] ASIN: {asin} | Product: {title} | Rating: {rating}/5\n{text}"
+            )
+
+        return "\n\n".join(parts)
