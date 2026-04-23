@@ -510,6 +510,12 @@ This mode displays:
 - a generated answer grounded in retrieved review context
 - the supporting retrieved documents shown below the answer
 
+### App Preview
+
+![Amazon Product Query Assistant app interface showing Search Only and RAG modes](assets/img/the_app.png)
+
+*Figure: The Smart Amazon Product Query Assistant interface.*
+
 ## Running the Notebooks
 
 You can run the notebooks in VS Code with Jupyter support, or launch Jupyter Lab:
