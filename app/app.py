@@ -13,6 +13,9 @@ from src.bm25 import BM25Retriever
 from src.hybrid import HybridRetriever
 from src.rag_pipeline import LLMPipeline
 from src.semantic import SemanticRetriever
+import os
+
+DEFAULT_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 
 def load_retrievers() -> tuple[
@@ -73,7 +76,7 @@ def load_llm_pipeline() -> LLMPipeline | None:
         Instantiated LLM pipeline if available, otherwise ``None``.
     """
     try:
-        return LLMPipeline(model="llama-3.1-8b-instant", temperature=0.0)
+        return LLMPipeline(model=DEFAULT_MODEL, temperature=0.0)
     except Exception:
         return None
 
@@ -289,7 +292,7 @@ def render_result_cards(
             ]
         )
 
-        ui_list.append(ui.div(*children))
+        ui_list.append(ui.div(*children, class_="result-card"))
 
         for btn_id, value in [(like_id, 1), (dislike_id, -1)]:
             try:
@@ -320,10 +323,101 @@ def render_result_cards(
 
 
 app_ui = ui.page_fluid(
+    ui.tags.style("""
+        body {
+            background-color: #f8fafc;
+            color: #1f2937;
+            font-family: Arial, sans-serif;
+        }
+
+        .container-fluid {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding-top: 1rem;
+            padding-bottom: 2rem;
+        }
+
+        h2 {
+            font-weight: 700;
+            margin-bottom: 0.4rem;
+            background: #e0f2fe;
+            padding: 0.9rem 1rem;
+            border-radius: 14px;
+            border: 1px solid #bae6fd;
+        }
+
+        .muted-text {
+            color: #6b7280;
+            font-size: 0.95rem;
+            margin-top: 0.6rem;
+            margin-bottom: 1rem;
+        }
+
+        .sidebar {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 14px;
+            padding: 1rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .shiny-input-radiogroup > label,
+        .shiny-input-container > label {
+            display: block;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 0.7rem !important;
+        }
+
+        .radio {
+            margin-top: 0.35rem;
+            margin-bottom: 1.1rem;
+        }
+
+        .radio label {
+            display: block;
+            margin-bottom: 0.45rem;
+        }
+
+        .form-control,
+        .form-select,
+        .btn {
+            border-radius: 10px !important;
+        }
+
+        .btn {
+            font-weight: 600;
+        }
+
+        .result-card {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 1rem 1.2rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .answer-panel {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 12px;
+            padding: 1rem 1.2rem;
+            margin-bottom: 1rem;
+        }
+
+        hr {
+            margin-top: 1rem;
+            margin-bottom: 0;
+            border-top: 1px solid #e5e7eb;
+        }
+    """),
+
     ui.h2("🔍 Amazon Product Query Assistant"),
     ui.p(
         "Search Amazon product reviews with BM25, semantic, or hybrid retrieval, "
-        "and switch to RAG mode for grounded answer generation."
+        "and switch to RAG mode for grounded answer generation.",
+        class_="muted-text",
     ),
     ui.page_sidebar(
         ui.sidebar(
@@ -486,10 +580,7 @@ def server(input, output, session):
         answer_panel = ui.div(
             ui.h4("Generated Answer"),
             ui.p(answer or "No answer generated."),
-            style=(
-                "background-color: #f8f9fa; padding: 1rem; "
-                "border-radius: 8px; margin-bottom: 1rem;"
-            ),
+            class_="answer-panel",
         )
 
         if not cards:
