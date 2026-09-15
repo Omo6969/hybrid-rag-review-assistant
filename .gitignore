@@ -20,6 +20,16 @@ data/processed/*
 *.index
 *.faiss
 *.npy
+
+# Small prebuilt sample retrieval artifacts are committed on purpose so that
+# Posit Connect Cloud (and anyone else without the full 701k-row dataset) can
+# deploy/run the app out of the box. See deploy/README.md.
+!deploy/sample_data/**/*.pkl
+!deploy/sample_data/**/*.pickle
+!deploy/sample_data/**/*.index
+!deploy/sample_data/**/*.faiss
+!deploy/sample_data/**/*.npy
+
 # Packaging / build artifacts
 build/
 dist/

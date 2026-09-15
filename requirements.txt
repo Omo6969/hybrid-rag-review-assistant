@@ -1,0 +1,21 @@
+# Runtime dependencies for deploying app/app.py (Python Shiny) to Posit
+# Connect Cloud. This is a curated, pip-installable subset of environment.yml
+# covering only what app/app.py (and the src/ modules it imports) needs at
+# runtime -- notebooks/EDA-only packages (jupyterlab, matplotlib, duckdb,
+# pyarrow, fastparquet, pandas) are intentionally left out to keep the build
+# small. faiss-cpu is pinned to the newest version published on PyPI; the
+# conda-forge build used in environment.yml (1.10.0) isn't on PyPI yet.
+shiny==1.6.0
+rank-bm25==0.2.2
+sentence-transformers==5.4.0
+faiss-cpu==1.9.0.post1
+numpy==2.4.3
+python-dotenv==1.2.2
+langchain==0.3.25
+langchain-core==1.3.0
+langchain-groq==0.3.2
+langchain-community==0.4.1
+langchain-huggingface==1.2.2
+transformers==5.5.3
+huggingface-hub==1.10.1
+tqdm==4.67.3

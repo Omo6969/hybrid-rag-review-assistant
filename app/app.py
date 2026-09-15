@@ -35,8 +35,20 @@ def load_retrievers() -> tuple[
     semantic = None
     hybrid = None
 
+    # Prefer the full locally-built indices (data/processed/). If they are not
+    # present -- e.g. on a fresh deployment such as Posit Connect Cloud, where
+    # the full 701k-row dataset isn't downloaded -- fall back to the small
+    # prebuilt sample indices bundled at deploy/sample_data/ so the app still
+    # works out of the box. See deploy/README.md for details.
     bm25_path = Path("data/processed/bm25_index")
     semantic_path = Path("data/processed/semantic_index")
+
+    if not bm25_path.exists() and not semantic_path.exists():
+        sample_bm25_path = Path("deploy/sample_data/bm25_index")
+        sample_semantic_path = Path("deploy/sample_data/semantic_index")
+        if sample_bm25_path.exists() and sample_semantic_path.exists():
+            bm25_path = sample_bm25_path
+            semantic_path = sample_semantic_path
 
     if bm25_path.exists():
         try:

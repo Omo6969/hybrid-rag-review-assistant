@@ -593,6 +593,8 @@ This repository now targets the **final submission**, which builds on Milestones
 - one additional feature beyond the Milestone 2 baseline
 - improved documentation, reproducibility, and code quality
 - a cloud deployment plan documented in `results/final_discussion.md`
+- a live deployment to **Posit Connect Cloud**; see `deploy/README.md` for how
+  the app is deployed and how the bundled sample retrieval index works
 
 ## Contributors
 
