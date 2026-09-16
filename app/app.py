@@ -4,6 +4,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import os
+import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -152,8 +153,27 @@ def ask_assistant(
             "language model isn't configured. Check that GROQ_API_KEY is set."
         )
 
-    docs = hybrid.search(query, TOP_K)
-    answer = llm_pipeline.generate(query=query, documents=docs)
+    try:
+        docs = hybrid.search(query, TOP_K)
+    except ValueError:
+        # e.g. a query that tokenizes to nothing (just punctuation/stopwords).
+        return None, [], (
+            "I couldn't quite understand that -- try asking in a few more "
+            "words, e.g. \"is this good for sensitive skin?\""
+        )
+
+    try:
+        answer = llm_pipeline.generate(query=query, documents=docs)
+    except Exception:
+        # Don't leak raw API errors (model name issues, rate limits, network
+        # blips, ...) to the shopper. The full traceback still goes to
+        # stderr/logs for whoever is operating the app to diagnose.
+        traceback.print_exc()
+        return None, docs, (
+            "Sorry, I couldn't come up with an answer just now. Please try "
+            "again in a moment."
+        )
+
     return answer, docs, None
 
 
