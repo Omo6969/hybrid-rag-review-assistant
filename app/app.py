@@ -217,7 +217,15 @@ def render_review_cards(
     ui_list: list[Any] = []
 
     for result in results_docs:
-        title = result.get("title", "No title")
+        # Prefer the product's real name (product_title, from item metadata)
+        # over the review's own headline (title -- user-written text like
+        # "This stuff is your friend!") so cards identify the product a
+        # shopper would recognize, not the review itself.
+        product_name = (
+            str(result.get("product_title") or "").strip()
+            or str(result.get("title") or "").strip()
+            or "This product"
+        )
         text = truncate(result.get("text", ""))
         rating = result.get("rating", "N/A")
         score = float(result.get("score", 0))
@@ -233,7 +241,7 @@ def render_review_cards(
 
         children = [
             ui.div(
-                ui.span(title, class_="review-title"),
+                ui.span(product_name, class_="review-title"),
                 ui.span(stars, class_="review-stars"),
                 class_="review-card-header",
             ),
@@ -265,7 +273,7 @@ def render_review_cards(
                             query,
                             "Hybrid RAG",
                             doc_id,
-                            title,
+                            product_name,
                             f"{score:.6f}",
                             value,
                         ]
@@ -523,7 +531,7 @@ def server(input, output, session):
         with open(feedback_file, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(
-                ["timestamp", "query", "mode", "doc_id", "title", "score", "feedback"]
+                ["timestamp", "query", "mode", "doc_id", "product", "score", "feedback"]
             )
 
     prev_counts: dict[str, int] = {}

@@ -198,7 +198,9 @@ def build_retrieval_dataframe(
     -------
     pd.DataFrame
         Retrieval-ready DataFrame containing:
-        `doc_id`, `parent_asin`, `asin`, `title`, `rating`, and `text`.
+        `doc_id`, `parent_asin`, `asin`, `title` (the review's own headline),
+        `product_title` (the product's actual name, from `meta_df`, empty
+        string if unavailable), `rating`, and `text`.
 
     Raises
     ------
@@ -221,11 +223,26 @@ def build_retrieval_dataframe(
         suffixes=("_review", "_meta"),
     )
 
+    # The product's real name comes from metadata ("title_meta" after the
+    # merge suffix), not from the review's own headline ("title_review") --
+    # the two are easy to conflate but serve very different purposes: the
+    # review headline is user-written ("This stuff is your friend!") while
+    # product_title is what a shopper would recognize as the item name. Both
+    # are kept: `title` for the review headline, `product_title` for the
+    # actual product, so RAG generation and the UI can refer to products by
+    # name instead of an opaque ASIN or a review number.
+    product_title_col = (
+        merged_df["title_meta"] if "title_meta" in merged_df.columns else ""
+    )
+
     retrieval_df = pd.DataFrame(
         {
             "parent_asin": merged_df["parent_asin"],
             "asin": merged_df["asin"],
             "title": merged_df["title_review"].fillna("").astype(str),
+            "product_title": pd.Series(product_title_col, index=merged_df.index)
+            .fillna("")
+            .astype(str),
             "review_text": merged_df["text"].fillna("").astype(str),
             "rating": pd.to_numeric(merged_df["rating"], errors="coerce"),
         }
@@ -243,7 +260,7 @@ def build_retrieval_dataframe(
         retrieval_df["text"] = retrieval_df["text"].apply(normalize_text)
 
     final_df = retrieval_df[
-        ["doc_id", "parent_asin", "asin", "title", "rating", "text"]
+        ["doc_id", "parent_asin", "asin", "title", "product_title", "rating", "text"]
     ].copy()
 
     # Remove rows with empty or non-tokenizable text.

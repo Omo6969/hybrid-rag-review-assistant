@@ -44,9 +44,13 @@ _RAG_TEMPLATE = ChatPromptTemplate.from_messages(
             "system",
             "You are a helpful assistant that answers questions about Amazon products "
             "based on customer reviews. Use only the provided review excerpts to answer. "
+            "The context below is grouped by product: each product's name is followed by "
+            "the customer reviews for it. When you refer to a product, always use its "
+            "product name (e.g. \"Product: ...\") -- never refer to a review by number "
+            "(e.g. never say \"review 1\" or \"review #4\"). "
             "If the reviews do not contain enough information, say so.",
         ),
-        ("human", "Review excerpts:\n{context}\n\nQuestion: {question}"),
+        ("human", "Product reviews:\n{context}\n\nQuestion: {question}"),
     ]
 )
 
@@ -93,26 +97,87 @@ PROMPT_VARIANTS: dict[str, ChatPromptTemplate] = {
 
 # Step 2 - Context builder
 
+def _resolve_product_name(fields: dict[str, object]) -> str:
+    """Resolve a shopper-friendly product name for a retrieval document.
+
+    Prefers the product's real name (``product_title``, sourced from item
+    metadata during preprocessing) over the review's own headline
+    (``title`` -- user-written text like "This stuff is your friend!") or a
+    bare ASIN, so the assistant can refer to products by name instead of an
+    opaque code or a review index.
+
+    Parameters
+    ----------
+    fields : dict of str to object
+        A retrieval document (or LangChain ``Document.metadata``).
+
+    Returns
+    -------
+    str
+        The best available product name.
+    """
+    product_title = str(fields.get("product_title") or "").strip()
+    if product_title:
+        return product_title
+
+    review_title = str(fields.get("title") or "").strip()
+    if review_title:
+        return review_title
+
+    return f"Product {fields.get('parent_asin', 'unknown')}"
+
+
+def _group_context_blocks(entries: list[tuple[str, object, str]]) -> str:
+    """Format ``(product_name, rating, text)`` entries into a context block.
+
+    Reviews for the same product are grouped together under one "Product:"
+    heading, rather than emitted as a flat, independently numbered list --
+    this is what lets the model talk about a named product supported by one
+    or more reviews, instead of citing "review 1" / "review #4".
+
+    Parameters
+    ----------
+    entries : list of tuple of (str, object, str)
+        ``(product_name, rating, review_text)`` tuples, one per review.
+
+    Returns
+    -------
+    str
+        A structured, prompt-ready string.
+    """
+    grouped: dict[str, list[tuple[object, str]]] = {}
+    order: list[str] = []
+
+    for product_name, rating, text in entries:
+        if product_name not in grouped:
+            grouped[product_name] = []
+            order.append(product_name)
+        grouped[product_name].append((rating, text))
+
+    blocks = []
+    for product_name in order:
+        review_lines = [
+            f"  - (Rating: {rating}/5) {text}" for rating, text in grouped[product_name]
+        ]
+        blocks.append(f"Product: {product_name}\n" + "\n".join(review_lines))
+
+    return "\n\n".join(blocks)
+
+
 def build_context(docs: list[Document]) -> str:
-    """Format a list of LangChain Documents into a numbered context block.
+    """Format a list of LangChain Documents into a product-grouped context.
 
     Args:
         docs: Retrieved LangChain Document objects.
 
     Returns:
-        A structured, prompt-ready string.
+        A structured, prompt-ready string, grouped by product name.
     """
-    parts = []
-    for i, doc in enumerate(docs, 1):
-        m = doc.metadata
-        asin = m.get("parent_asin", "N/A")
-        title = m.get("title", "")
-        rating = m.get("rating", "N/A")
-        text = doc.page_content[:400]
-        parts.append(
-            f"[{i}] ASIN: {asin} | Product: {title} | Rating: {rating}/5\n{text}"
-        )
-    return "\n\n".join(parts)
+    entries = [
+        (_resolve_product_name(doc.metadata), doc.metadata.get("rating", "N/A"), doc.page_content[:400])
+        for doc in docs
+    ]
+    return _group_context_blocks(entries)
 
 
 # Step 2 - Vectorstore builder
@@ -269,20 +334,25 @@ class LLMPipeline:
 
     @staticmethod
     def _build_context(documents: list[dict], max_docs: int = 5) -> str:
-        """_summary_
+        """Format retrieved review documents into a product-grouped context.
 
-        Args:
-            documents (list[dict]): _description_
-            max_docs (int, optional): _description_. Defaults to 5.
+        Parameters
+        ----------
+        documents : list of dict
+            Retrieved documents, each expected to have ``text`` and
+            ``rating``, plus (when available) ``product_title`` for the
+            product's real name.
+        max_docs : int, default=5
+            Maximum number of documents to include.
 
-        Returns:
-            str: _description_
+        Returns
+        -------
+        str
+            A structured, prompt-ready string, grouped by product name so
+            the model can refer to products rather than review numbers.
         """
-        lines = []
-        for i, doc in enumerate(documents[:max_docs], 1):
-            title = doc.get("title", "")
-            text = doc.get("text", "")
-            rating = doc.get("rating", "")
-            snippet = f"{i}. [{title}] (Rating: {rating})\n   {text[:300]}"
-            lines.append(snippet)
-        return "\n\n".join(lines)
+        entries = [
+            (_resolve_product_name(doc), doc.get("rating", "N/A"), str(doc.get("text", ""))[:300])
+            for doc in documents[:max_docs]
+        ]
+        return _group_context_blocks(entries)
