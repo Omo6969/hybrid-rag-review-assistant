@@ -13,7 +13,9 @@ By the **final submission**, the system includes:
 - **Prompt experimentation** across multiple prompt variants
 - **Qualitative evaluation** of generated answers using accuracy, completeness, and fluency
 - **Quantitative evaluation** using retrieval metrics such as precision@k and recall@k
-- An improved interactive app supporting both **Search Only** and **RAG Mode**
+- A user-focused shopping assistant app: no retrieval-mode toggles -- every
+  question runs through **hybrid retrieval** and returns a **grounded RAG
+  answer** with supporting reviews
 
 The project initially explored two categories:
 
@@ -277,7 +279,7 @@ These variables are used by:
 - `src/rag_pipeline.py`
 - `notebooks/milestone2_rag.ipynb`
 - `notebooks/final_llm_experiment.ipynb`
-- `app/app.py` when running in RAG Mode
+- `app/app.py`, to generate every answer (the app always runs RAG)
 
 `GROQ_MODEL` controls the default model used for answer generation.
 
@@ -481,40 +483,27 @@ http://127.0.0.1:8000
 
 Open that link in your browser to use the app.
 
-#### App modes
+#### How the app works
 
-The app supports two top-level modes:
+The app is a single-purpose shopping assistant: type a question and press
+**Ask**. There are no retrieval-method or mode toggles to configure --
+under the hood, every question always runs through **hybrid retrieval**
+(BM25 + semantic search, combined with weighted RRF) feeding a **grounded
+RAG answer**. This keeps the interface focused on the assistant experience
+rather than the retrieval internals; the BM25/semantic/hybrid comparison
+and Search-Only-vs-RAG-Mode toggle from earlier milestones live on in the
+notebooks and `results/` discussions for anyone evaluating retrieval
+methods directly.
 
-- Search Only
-- RAG Mode
-
-#### Search Only
-
-Supports:
-
-- BM25
-- Semantic
-- Hybrid
-
-This mode displays retrieved review documents only.
-
-#### RAG Mode
-
-Supports:
-
-- Semantic RAG
-- Hybrid RAG
-
-This mode displays:
-
-- a generated answer grounded in retrieved review context
-- the supporting retrieved documents shown below the answer
+Each answer is shown together with the customer reviews it was grounded
+in, with a 👍/👎 to flag whether a given review was helpful.
 
 ### App Preview
 
-![Amazon Product Query Assistant app interface showing Search Only and RAG modes](assets/img/the_app.png)
+![Amazon Beauty Shopping Assistant interface showing a grounded answer and supporting reviews](assets/img/the_app.png)
 
-*Figure: The Smart Amazon Product Query Assistant interface.*
+*Figure: The Amazon Beauty Shopping Assistant interface. (Screenshot predates
+the current single-mode assistant UI; see `app/app.py` for the latest.)*
 
 ## Running the Notebooks
 

@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import csv
 import hashlib
-from datetime import datetime
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -13,28 +14,28 @@ from src.bm25 import BM25Retriever
 from src.hybrid import HybridRetriever
 from src.rag_pipeline import LLMPipeline
 from src.semantic import SemanticRetriever
-import os
 
 DEFAULT_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
+# Number of supporting reviews the assistant grounds each answer in. This is
+# an internal retrieval setting, not something a shopper needs to think
+# about, so it isn't exposed as a UI control.
+TOP_K = 5
 
-def load_retrievers() -> tuple[
-    BM25Retriever | None,
-    SemanticRetriever | None,
-    HybridRetriever | None,
-]:
-    """Load the retrievers required by the app.
+
+def load_hybrid_retriever() -> HybridRetriever | None:
+    """Load the hybrid (BM25 + semantic) retriever used by the assistant.
+
+    The assistant always searches with hybrid retrieval -- it combines
+    keyword and semantic matching under the hood -- so this is the only
+    retriever the app needs to load.
 
     Returns
     -------
-    tuple
-        Tuple containing the BM25 retriever, semantic retriever, and hybrid
-        retriever. Any component that cannot be loaded is returned as ``None``.
+    HybridRetriever or None
+        The hybrid retriever, or ``None`` if its underlying indices are
+        unavailable or fail to load.
     """
-    bm25 = None
-    semantic = None
-    hybrid = None
-
     # Prefer the full locally-built indices (data/processed/). If they are not
     # present -- e.g. on a fresh deployment such as Posit Connect Cloud, where
     # the full 701k-row dataset isn't downloaded -- fall back to the small
@@ -50,33 +51,20 @@ def load_retrievers() -> tuple[
             bm25_path = sample_bm25_path
             semantic_path = sample_semantic_path
 
-    if bm25_path.exists():
-        try:
-            bm25 = BM25Retriever.load(bm25_path)
-        except Exception:
-            bm25 = None
-
-    if semantic_path.exists():
-        try:
-            semantic = SemanticRetriever.load(semantic_path)
-        except Exception:
-            semantic = None
-
-    if bm25 is not None and semantic is not None:
-        try:
-            hybrid = HybridRetriever(
-                bm25_retriever=bm25,
-                semantic_retriever=semantic,
-                bm25_weight=0.4,
-                semantic_weight=0.6,
-                rrf_k=60,
-                fetch_k=10,
-                key_field="doc_id",
-            )
-        except Exception:
-            hybrid = None
-
-    return bm25, semantic, hybrid
+    try:
+        bm25 = BM25Retriever.load(bm25_path)
+        semantic = SemanticRetriever.load(semantic_path)
+        return HybridRetriever(
+            bm25_retriever=bm25,
+            semantic_retriever=semantic,
+            bm25_weight=0.4,
+            semantic_weight=0.6,
+            rrf_k=60,
+            fetch_k=10,
+            key_field="doc_id",
+        )
+    except Exception:
+        return None
 
 
 def load_llm_pipeline() -> LLMPipeline | None:
@@ -93,14 +81,14 @@ def load_llm_pipeline() -> LLMPipeline | None:
         return None
 
 
-def truncate(text: str, n: int = 200) -> str:
+def truncate(text: str, n: int = 220) -> str:
     """Truncate text for display.
 
     Parameters
     ----------
     text : str
         Input text.
-    n : int, default=200
+    n : int, default=220
         Maximum length of the returned string.
 
     Returns
@@ -131,122 +119,62 @@ def get_doc_id(doc: dict[str, Any]) -> str:
     return hashlib.md5(text).hexdigest()
 
 
-def run_search_only(
+def ask_assistant(
     query: str,
-    mode: str,
-    top_k: int,
-    bm25: BM25Retriever | None,
-    semantic: SemanticRetriever | None,
-    hybrid: HybridRetriever | None,
-) -> tuple[list[dict[str, Any]], str | None]:
-    """Run retrieval-only search.
-
-    Parameters
-    ----------
-    query : str
-        User query.
-    mode : str
-        Retrieval mode. One of ``BM25``, ``Semantic``, or ``Hybrid``.
-    top_k : int
-        Number of results to return.
-    bm25 : BM25Retriever or None
-        BM25 retriever.
-    semantic : SemanticRetriever or None
-        Semantic retriever.
-    hybrid : HybridRetriever or None
-        Hybrid retriever.
-
-    Returns
-    -------
-    tuple
-        Tuple of ``(results, error_message)``. If successful, the error message
-        is ``None``.
-    """
-    if mode == "BM25":
-        if bm25 is None:
-            return [], "BM25 index not found. Please build it first."
-        return bm25.search(query, top_k), None
-
-    if mode == "Semantic":
-        if semantic is None:
-            return [], "Semantic index not found. Please build it first."
-        return semantic.search(query, top_k), None
-
-    if hybrid is None:
-        return [], "Both BM25 and Semantic indices are required for Hybrid mode."
-
-    return hybrid.search(query, top_k), None
-
-
-def run_rag(
-    query: str,
-    mode: str,
-    top_k: int,
-    semantic: SemanticRetriever | None,
     hybrid: HybridRetriever | None,
     llm_pipeline: LLMPipeline | None,
 ) -> tuple[str | None, list[dict[str, Any]], str | None]:
-    """Run RAG mode.
+    """Answer a shopper's question, grounded in retrieved customer reviews.
 
     Parameters
     ----------
     query : str
-        User query.
-    mode : str
-        RAG mode. One of ``Semantic RAG`` or ``Hybrid RAG``.
-    top_k : int
-        Number of retrieved documents to use.
-    semantic : SemanticRetriever or None
-        Semantic retriever.
+        The shopper's question.
     hybrid : HybridRetriever or None
-        Hybrid retriever.
+        Hybrid retriever used to find supporting reviews.
     llm_pipeline : LLMPipeline or None
-        LLM pipeline for grounded generation.
+        LLM pipeline used to generate the grounded answer.
 
     Returns
     -------
     tuple
-        Tuple of ``(answer, docs, error_message)``.
+        Tuple of ``(answer, supporting_reviews, error_message)``.
     """
-    if llm_pipeline is None:
+    if hybrid is None:
         return None, [], (
-            "RAG mode is unavailable because the LLM pipeline could not be "
-            "initialized. Check that your GROQ_API_KEY is set."
+            "The assistant isn't set up yet -- its review index hasn't been "
+            "built. Run the setup steps in the README, then restart the app."
         )
 
-    if mode == "Semantic RAG":
-        if semantic is None:
-            return None, [], "Semantic index not found. Please build it first."
-        docs = semantic.search(query, top_k)
-    else:
-        if hybrid is None:
-            return None, [], (
-                "Hybrid RAG requires both BM25 and Semantic indices to be available."
-            )
-        docs = hybrid.search(query, top_k)
+    if llm_pipeline is None:
+        return None, [], (
+            "The assistant can't generate answers right now because its "
+            "language model isn't configured. Check that GROQ_API_KEY is set."
+        )
 
+    docs = hybrid.search(query, TOP_K)
     answer = llm_pipeline.generate(query=query, documents=docs)
     return answer, docs, None
 
 
-def render_result_cards(
+def render_review_cards(
     results_docs: list[dict[str, Any]],
     query: str,
-    mode: str,
     input: Any,
     feedback_file: Path,
     prev_counts: dict[str, int],
 ) -> list[Any]:
-    """Render retrieval results as UI cards and log user feedback.
+    """Render supporting reviews as compact cards and log user feedback.
+
+    Only shopper-relevant details are shown -- product, rating, and a short
+    quote from the review -- with no retrieval scores or internals.
 
     Parameters
     ----------
     results_docs : list of dict of str to Any
         Retrieved documents to display.
     query : str
-        User query.
-    mode : str
-        Current app mode or retriever mode.
+        The shopper's question.
     input : Any
         Shiny input object.
     feedback_file : pathlib.Path
@@ -261,7 +189,7 @@ def render_result_cards(
     """
     ui_list: list[Any] = []
 
-    for i, result in enumerate(results_docs, 1):
+    for result in results_docs:
         title = result.get("title", "No title")
         text = truncate(result.get("text", ""))
         rating = result.get("rating", "N/A")
@@ -269,40 +197,27 @@ def render_result_cards(
         doc_id = get_doc_id(result)
 
         try:
-            stars = "★" * int(round(float(rating)))
+            stars = "★" * int(round(float(rating))) + "☆" * (5 - int(round(float(rating))))
         except Exception:
             stars = str(rating)
-
-        retrieval_sources = result.get("retrieval_sources")
-        sources_line = (
-            f"Sources: {', '.join(retrieval_sources)}"
-            if isinstance(retrieval_sources, list) and retrieval_sources
-            else None
-        )
 
         like_id = f"like_{doc_id}"
         dislike_id = f"dislike_{doc_id}"
 
         children = [
-            ui.h5(f"{i}. {title}"),
-            ui.p(text),
-            ui.p(f"Rating: {stars} ({rating})"),
-            ui.p(f"Score: {score:.4f}"),
+            ui.div(
+                ui.span(title, class_="review-title"),
+                ui.span(stars, class_="review-stars"),
+                class_="review-card-header",
+            ),
+            ui.p(f"“{text}”", class_="review-quote"),
+            ui.div(
+                ui.span("Helpful?", class_="feedback-label"),
+                ui.input_action_button(like_id, "👍", class_="feedback-btn"),
+                ui.input_action_button(dislike_id, "👎", class_="feedback-btn"),
+                class_="review-footer",
+            ),
         ]
-
-        if result.get("parent_asin"):
-            children.append(ui.p(f"ASIN: {result['parent_asin']}"))
-
-        if sources_line is not None:
-            children.append(ui.p(sources_line))
-
-        children.extend(
-            [
-                ui.input_action_button(like_id, "👍"),
-                ui.input_action_button(dislike_id, "👎"),
-                ui.hr(),
-            ]
-        )
 
         ui_list.append(ui.div(*children, class_="result-card"))
 
@@ -319,9 +234,9 @@ def render_result_cards(
                     writer = csv.writer(f)
                     writer.writerow(
                         [
-                            datetime.utcnow().isoformat(),
+                            datetime.now(timezone.utc).isoformat(),
                             query,
-                            mode,
+                            "Hybrid RAG",
                             doc_id,
                             title,
                             f"{score:.6f}",
@@ -337,126 +252,226 @@ def render_result_cards(
 app_ui = ui.page_fluid(
     ui.tags.style("""
         body {
-            background-color: #f8fafc;
+            background: linear-gradient(180deg, #f0f9ff 0%, #f8fafc 320px);
             color: #1f2937;
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Arial, sans-serif;
         }
 
         .container-fluid {
-            max-width: 1200px;
+            max-width: 760px;
             margin: 0 auto;
-            padding-top: 1rem;
-            padding-bottom: 2rem;
+            padding-top: 2.5rem;
+            padding-bottom: 3rem;
         }
 
-        h2 {
+        .hero {
+            text-align: center;
+            margin-bottom: 1.75rem;
+        }
+
+        .hero-icon {
+            font-size: 2.4rem;
+            line-height: 1;
+        }
+
+        .hero h2 {
             font-weight: 700;
-            margin-bottom: 0.4rem;
-            background: #e0f2fe;
-            padding: 0.9rem 1rem;
-            border-radius: 14px;
-            border: 1px solid #bae6fd;
+            font-size: 1.6rem;
+            margin: 0.4rem 0 0.3rem 0;
         }
 
-        .muted-text {
+        .hero p {
             color: #6b7280;
+            font-size: 1rem;
+            margin: 0;
+        }
+
+        .ask-bar {
+            display: flex;
+            gap: 0.6rem;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            padding: 0.5rem 0.5rem 0.5rem 1.2rem;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+            margin-bottom: 1.75rem;
+            align-items: center;
+        }
+
+        .ask-bar .shiny-input-container,
+        .ask-bar .form-group {
+            flex: 1;
+            margin-bottom: 0 !important;
+        }
+
+        .ask-bar input[type="text"] {
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0.4rem 0 !important;
+            font-size: 1rem;
+        }
+
+        .ask-bar input[type="text"]:focus {
+            outline: none;
+            box-shadow: none;
+        }
+
+        #ask {
+            border-radius: 999px !important;
+            padding: 0.55rem 1.4rem !important;
+            font-weight: 600;
+            background-color: #0284c7;
+            border-color: #0284c7;
+            color: white;
+            white-space: nowrap;
+        }
+
+        #ask:hover {
+            background-color: #0369a1;
+            border-color: #0369a1;
+        }
+
+        .hint-text {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 0.9rem;
+            margin-top: -1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .assistant-message {
+            display: flex;
+            gap: 0.8rem;
+            background: #ffffff;
+            border: 1px solid #e0f2fe;
+            border-radius: 16px;
+            padding: 1.1rem 1.3rem;
+            margin-bottom: 1.6rem;
+            box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+        }
+
+        .assistant-avatar {
+            font-size: 1.5rem;
+            line-height: 1.4;
+        }
+
+        .assistant-text {
+            margin: 0;
+            line-height: 1.55;
+            white-space: pre-wrap;
+        }
+
+        .evidence-heading {
             font-size: 0.95rem;
-            margin-top: 0.6rem;
-            margin-bottom: 1rem;
-        }
-
-        .sidebar {
-            background: #f0f9ff;
-            border: 1px solid #bae6fd;
-            border-radius: 14px;
-            padding: 1rem;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-        }
-
-        .shiny-input-radiogroup > label,
-        .shiny-input-container > label {
-            display: block;
-            font-weight: 600;
-            color: #111827;
-            margin-bottom: 0.7rem !important;
-        }
-
-        .radio {
-            margin-top: 0.35rem;
-            margin-bottom: 1.1rem;
-        }
-
-        .radio label {
-            display: block;
-            margin-bottom: 0.45rem;
-        }
-
-        .form-control,
-        .form-select,
-        .btn {
-            border-radius: 10px !important;
-        }
-
-        .btn {
-            font-weight: 600;
+            font-weight: 700;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-bottom: 0.8rem;
         }
 
         .result-card {
             background: #ffffff;
             border: 1px solid #e5e7eb;
             border-radius: 12px;
-            padding: 1rem 1.2rem;
-            margin-bottom: 1rem;
+            padding: 0.9rem 1.1rem;
+            margin-bottom: 0.9rem;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
         }
 
-        .answer-panel {
-            background: #eff6ff;
-            border: 1px solid #bfdbfe;
-            border-radius: 12px;
-            padding: 1rem 1.2rem;
-            margin-bottom: 1rem;
+        .review-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 0.5rem;
+            margin-bottom: 0.35rem;
         }
 
-        hr {
-            margin-top: 1rem;
-            margin-bottom: 0;
-            border-top: 1px solid #e5e7eb;
+        .review-title {
+            font-weight: 600;
+            color: #111827;
+        }
+
+        .review-stars {
+            color: #f59e0b;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .review-quote {
+            color: #4b5563;
+            font-style: italic;
+            margin: 0 0 0.5rem 0;
+        }
+
+        .review-footer {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .feedback-label {
+            color: #9ca3af;
+            font-size: 0.82rem;
+            margin-right: 0.2rem;
+        }
+
+        .feedback-btn {
+            border: none !important;
+            background: transparent !important;
+            padding: 0.1rem 0.3rem !important;
+            font-size: 0.95rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #9ca3af;
+            margin-top: 1.5rem;
+        }
+
+        .error-banner {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            border-radius: 12px;
+            padding: 0.9rem 1.1rem;
         }
     """),
 
-    ui.h2("🔍 Amazon Product Query Assistant"),
-    ui.p(
-        "Search Amazon product reviews with BM25, semantic, or hybrid retrieval, "
-        "and switch to RAG mode for grounded answer generation.",
-        class_="muted-text",
+    ui.tags.script("""
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' && document.activeElement && document.activeElement.id === 'query') {
+                event.preventDefault();
+                var askButton = document.getElementById('ask');
+                if (askButton) { askButton.click(); }
+            }
+        });
+    """),
+
+    ui.div(
+        ui.div("🛍️", class_="hero-icon"),
+        ui.h2("Amazon Beauty Shopping Assistant"),
+        ui.p("Ask a question and get an answer grounded in real customer reviews."),
+        class_="hero",
     ),
-    ui.page_sidebar(
-        ui.sidebar(
-            ui.input_radio_buttons(
-                "app_mode",
-                "App Mode",
-                choices=["Search Only", "RAG Mode"],
-                selected="Search Only",
-            ),
-            ui.output_ui("mode_selector"),
-            ui.input_numeric(
-                "top_k",
-                "Number of results",
-                value=3,
-                min=1,
-                max=10,
-            ),
-            ui.input_text("query", "Enter your query"),
-            ui.input_action_button("search", "Search"),
+
+    ui.div(
+        ui.input_text(
+            "query",
+            None,
+            placeholder="e.g. What's a good lip balm for very dry lips?",
+            width="100%",
         ),
-        ui.output_ui("results"),
+        ui.input_action_button("ask", "Ask"),
+        class_="ask-bar",
     ),
+
+    ui.output_ui("results"),
 )
 
 
 def server(input, output, session):
-    """Run the Shiny server for the Milestone 2 app.
+    """Run the Shiny server for the Amazon Beauty Shopping Assistant.
 
     Parameters
     ----------
@@ -471,7 +486,7 @@ def server(input, output, session):
     -------
     None
     """
-    bm25, semantic, hybrid = load_retrievers()
+    hybrid = load_hybrid_retriever()
     llm_pipeline = load_llm_pipeline()
 
     feedback_file = Path("data/processed/feedback.csv")
@@ -488,122 +503,54 @@ def server(input, output, session):
 
     @output
     @render.ui
-    def mode_selector():
-        """Render the mode selector based on the chosen app mode.
-
-        Returns
-        -------
-        Any
-            Shiny UI component.
-        """
-        if input.app_mode() == "Search Only":
-            return ui.input_radio_buttons(
-                "retrieval_mode",
-                "Search Mode",
-                choices=["BM25", "Semantic", "Hybrid"],
-                selected="BM25",
-            )
-
-        return ui.input_radio_buttons(
-            "retrieval_mode",
-            "RAG Mode",
-            choices=["Semantic RAG", "Hybrid RAG"],
-            selected="Hybrid RAG",
-        )
-
-    @output
-    @render.ui
     def results():
-        """Render the app results panel.
+        """Render the assistant's answer and its supporting reviews.
 
         Returns
         -------
         Any
             Shiny UI output.
         """
-        if input.search() == 0:
-            return ui.TagList(
-                ui.p("Enter a query and click Search."),
-                ui.p(
-                    "Use Search Only for retrieval results or RAG Mode for a generated answer "
-                    "grounded in retrieved review documents."
-                ),
+        if input.ask() == 0:
+            return ui.p(
+                "Ask about a product, ingredient, or use case -- for example "
+                "“is this good for sensitive skin?”",
+                class_="empty-state",
             )
 
         query = input.query().strip()
-        app_mode = input.app_mode()
-        mode = input.retrieval_mode() or "BM25"
-        top_k = int(input.top_k() or 3)
-
         if not query:
-            return ui.p("Please enter a query.")
+            return ui.p("Type a question to get started.", class_="empty-state")
 
-        if app_mode == "Search Only":
-            results_docs, error = run_search_only(
-                query=query,
-                mode=mode,
-                top_k=top_k,
-                bm25=bm25,
-                semantic=semantic,
-                hybrid=hybrid,
-            )
-
-            if error is not None:
-                return ui.p(error)
-
-            cards = render_result_cards(
-                results_docs=results_docs,
-                query=query,
-                mode=mode,
-                input=input,
-                feedback_file=feedback_file,
-                prev_counts=prev_counts,
-            )
-
-            if not cards:
-                return ui.p("No results found.")
-
-            return ui.TagList(
-                ui.h4("Retrieved Results"),
-                *cards,
-            )
-
-        answer, results_docs, error = run_rag(
+        answer, results_docs, error = ask_assistant(
             query=query,
-            mode=mode,
-            top_k=top_k,
-            semantic=semantic,
             hybrid=hybrid,
             llm_pipeline=llm_pipeline,
         )
 
         if error is not None:
-            return ui.p(error)
+            return ui.div(error, class_="error-banner")
 
-        cards = render_result_cards(
+        answer_message = ui.div(
+            ui.div("🛍️", class_="assistant-avatar"),
+            ui.p(answer or "I couldn't find a confident answer for that.", class_="assistant-text"),
+            class_="assistant-message",
+        )
+
+        cards = render_review_cards(
             results_docs=results_docs,
             query=query,
-            mode=mode,
             input=input,
             feedback_file=feedback_file,
             prev_counts=prev_counts,
         )
 
-        answer_panel = ui.div(
-            ui.h4("Generated Answer"),
-            ui.p(answer or "No answer generated."),
-            class_="answer-panel",
-        )
-
         if not cards:
-            return ui.TagList(
-                answer_panel,
-                ui.p("No supporting documents found."),
-            )
+            return answer_message
 
         return ui.TagList(
-            answer_panel,
-            ui.h4("Supporting Retrieved Documents"),
+            answer_message,
+            ui.div("What customers are saying", class_="evidence-heading"),
             *cards,
         )
 
