@@ -16,7 +16,14 @@ from src.hybrid import HybridRetriever
 from src.rag_pipeline import LLMPipeline
 from src.semantic import SemanticRetriever
 
-DEFAULT_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# llama-3.3-70b-versatile (the model chosen in results/final_discussion.md's
+# LLM experiment) and llama-3.1-8b-instant have since been retired from Groq;
+# openai/gpt-oss-20b is the current closest equivalent available -- fast
+# enough for interactive use. Override with the GROQ_MODEL env var (e.g. to
+# openai/gpt-oss-120b) for stronger multi-document reasoning at the cost of
+# latency. Check your account's available models at
+# https://console.groq.com/playground or `GET /openai/v1/models`.
+DEFAULT_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 
 # Number of supporting reviews the assistant grounds each answer in. This is
 # an internal retrieval setting, not something a shopper needs to think
